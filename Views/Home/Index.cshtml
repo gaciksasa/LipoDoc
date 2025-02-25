@@ -1,0 +1,46 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Device Data Collector</h1>
+    <p>TCP/IP server is running and collecting data from connected devices.</p>
+
+    <div class="row mt-4">
+        <div class="col-md-6 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Server Status</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Server is running at:</strong> @(Context.Request.Host.Host):8080</p>
+                    <p><strong>Database:</strong> Connected</p>
+                    <p><strong>Total Records:</strong> <span id="recordCount">Loading...</span></p>
+                </div>
+                <div class="card-footer">
+                    <a asp-controller="DeviceData" asp-action="Index" class="btn btn-primary">View Collected Data</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Simple function to update record count
+        function updateRecordCount() {
+            fetch('/DeviceData/GetCount')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('recordCount').innerText = data;
+                })
+                .catch(error => {
+                    console.error('Error fetching record count:', error);
+                });
+        }
+
+        // Update on page load and periodically
+        updateRecordCount();
+        setInterval(updateRecordCount, 5000);
+    </script>
+}

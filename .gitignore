@@ -1,0 +1,34 @@
+# Compiled binaries
+*.exe
+*.dll
+*.pdb
+*.obj
+*.suo
+*.user
+*.userprefs
+*.cache
+*.ilk
+*.exp
+
+# Visual Studio specific files
+.vs/
+*.vssscc
+*.vsdps
+*.sdf
+*.opensdf
+*.sln.docstates
+
+# Build outputs
+bin/
+obj/
+Debug/
+Release/
+
+# NuGet packages (if you use them - often better to restore rather than commit)
+packages/
+
+# Other temporary files
+*.tmp
+*.log
+
+# Project-specific ignores (add as needed)
