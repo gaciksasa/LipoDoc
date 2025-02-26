@@ -46,20 +46,23 @@ Database and TCP server settings can be configured in `appsettings.json`:
 }
 ```
 
+> **Important**: Before running the application, ensure you've configured the loopback addresses (127.0.0.2 and 127.0.0.3) as described in the "Configuring Additional Local IP Addresses" section below.
+
 ### Running the Application
 
 1. Clone the repository
 2. Update the database connection string in `appsettings.json`
-3. Apply database migrations:
+3. Configure the required loopback IP addresses (127.0.0.2 and 127.0.0.3) as described in the "Configuring Additional Local IP Addresses" section below
+4. Apply database migrations:
    ```
    dotnet ef database update
    ```
-4. Run the application:
+5. Run the application:
    ```
    dotnet run
    ```
 
-The application will start, and the TCP server will begin listening on the configured IP address and port.
+The application will start, and the TCP server will begin listening on the configured IP address (127.0.0.2) and port (5000).
 
 ## Key Components
 
@@ -113,6 +116,65 @@ For testing, you can use tools like:
 - The application is configured to distinguish between messages sent from the web interface and actual device data.
 - Messages sent via the web interface are not stored in the database.
 - The server automatically adds a newline character to messages if not present.
+
+## Configuring Additional Local IP Addresses
+
+For testing purposes, you may need to set up additional loopback IP addresses (like 127.0.0.2, 127.0.0.3, etc.) on your local machine. The application requires two different loopback addresses:
+
+1. **127.0.0.2** - Used by the application's TCP server (configured in `appsettings.json`)
+2. **127.0.0.3** - Typically used for testing clients like Hercules
+
+Here's how to add these addresses:
+
+### Windows
+
+1. Open Command Prompt as Administrator
+2. Add a new loopback IP address using the following command:
+   ```
+   netsh interface ipv4 add address "Loopback Adapter" 127.0.0.3 255.0.0.0
+   ```
+   Replace "Loopback Adapter" with your loopback adapter name if different.
+   
+3. Verify the IP address was added:
+   ```
+   netsh interface ipv4 show ipaddresses
+   ```
+
+4. To make this persistent across reboots, create a batch file with the command and add it to your startup items.
+
+### Linux
+
+1. Temporarily add a loopback IP address:
+   ```
+   sudo ip addr add 127.0.0.3/8 dev lo
+   ```
+
+2. Verify it was added:
+   ```
+   ip addr show dev lo
+   ```
+
+3. To make it persistent, add to `/etc/network/interfaces`:
+   ```
+   auto lo:0
+   iface lo:0 inet static
+       address 127.0.0.3
+       netmask 255.0.0.0
+   ```
+
+### macOS
+
+1. Temporarily add a loopback IP address:
+   ```
+   sudo ifconfig lo0 alias 127.0.0.3/8
+   ```
+
+2. Verify it was added:
+   ```
+   ifconfig lo0
+   ```
+
+3. To make it persistent, create a launch daemon.
 
 ## Database Management
 
