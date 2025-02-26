@@ -15,7 +15,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     )
 );
 
-builder.Services.AddHostedService<TCPServerService>();
+// Register TCP server service as a singleton so we can directly inject it
+builder.Services.AddSingleton<TCPServerService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPServerService>());
 
 var app = builder.Build();
 
