@@ -61,32 +61,26 @@
 
 @section Scripts {
     <script>
-        // Only try to fetch record count if database is connected
-        @if (ViewBag.DatabaseConnected)
-        {
-            <text>
-                // Simple function to update record count
-                function updateRecordCount() {
-                    fetch('/DeviceData/GetCount')
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Network response was not ok');
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            document.getElementById('recordCount').innerText = data;
-                        })
-                        .catch(error => {
-                            console.error('Error fetching record count:', error);
-                            document.getElementById('recordCount').innerText = 'Error loading count';
-                        });
-                }
-
-                // Update on page load and periodically
-                updateRecordCount();
-                setInterval(updateRecordCount, 5000);
-            </text>
+        // Simple function to update record count
+        function updateRecordCount() {
+            fetch('/DeviceData/GetCount')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('recordCount').innerText = data;
+                })
+                .catch(error => {
+                    console.error('Error fetching record count:', error);
+                    document.getElementById('recordCount').innerText = 'Error loading count';
+                });
         }
+
+        // Update on page load and periodically
+        updateRecordCount();
+        setInterval(updateRecordCount, 5000);
     </script>
 }
