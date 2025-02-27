@@ -1,0 +1,76 @@
+﻿@model DeviceDataCollector.Models.User
+
+@{
+    ViewData["Title"] = "Delete User";
+}
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Confirm Deletion</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Are you sure you want to delete this user? This action cannot be undone.
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Username</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @Model.Username
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Role</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @if (Model.Role == "Admin")
+                            {
+                                <span class="badge bg-primary">Administrator</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Regular User</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Full Name</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @(string.IsNullOrEmpty(Model.FullName) ? "-" : Model.FullName)
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Email</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @(string.IsNullOrEmpty(Model.Email) ? "-" : Model.Email)
+                        </div>
+                    </div>
+
+                    <form asp-action="Delete">
+                        <input type="hidden" asp-for="Id" />
+                        <div class="d-flex justify-content-between mt-4">
+                            <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
