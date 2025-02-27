@@ -1,8 +1,8 @@
-﻿@model DeviceDataCollector.Controllers.PaginatedList<DeviceDataCollector.Models.DeviceData>
+﻿@model DeviceDataCollector.Controllers.PaginatedList<DeviceDataCollector.Models.DonationsData>
 
 @{
     var device = ViewBag.Device as DeviceDataCollector.Models.Device;
-    ViewData["Title"] = $"Data for {device.Name}";
+    ViewData["Title"] = $"Donations from {device.Name}";
 }
 
 <div class="container-fluid">
@@ -13,7 +13,7 @@
                     <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
                     <li class="breadcrumb-item"><a asp-action="Index">Devices</a></li>
                     <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@device.Id">@device.SerialNumber</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Data</li>
+                    <li class="breadcrumb-item active" aria-current="page">Donations</li>
                 </ol>
             </nav>
         </div>
@@ -21,27 +21,27 @@
 
     <div class="card mb-4">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Device Data: @device.Name (@device.SerialNumber)</h5>
+            <h5 class="mb-0">Donations from: @device.Name (@device.SerialNumber)</h5>
         </div>
         <div class="card-header bg-light">
-            <form asp-action="Data" method="get" class="row g-3">
+            <form asp-action="Donations" method="get" class="row g-3">
                 <input type="hidden" name="id" value="@device.Id" />
                 <div class="col-md-6">
                     <div class="input-group">
-                        <input type="text" class="form-control" placeholder="Search barcode data..." name="searchString" value="@ViewBag.CurrentFilter">
+                        <input type="text" class="form-control" placeholder="Search donation or operator ID..." name="searchString" value="@ViewBag.CurrentFilter">
                         <button class="btn btn-outline-secondary" type="submit">Search</button>
-                        <a asp-action="Data" asp-route-id="@device.Id" class="btn btn-outline-secondary">Clear</a>
+                        <a asp-action="Donations" asp-route-id="@device.Id" class="btn btn-outline-secondary">Clear</a>
                     </div>
                 </div>
                 <div class="col-md-6 text-end">
                     <div class="btn-group" role="group">
-                        <a asp-action="Data" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.TimestampSortParm" class="btn btn-outline-secondary">
+                        <a asp-action="Donations" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.TimestampSortParm" class="btn btn-outline-secondary">
                             <i class="bi bi-clock"></i> Date
                         </a>
-                        <a asp-action="Data" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.LipemicValueSortParm" class="btn btn-outline-secondary">
+                        <a asp-action="Donations" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.LipemicValueSortParm" class="btn btn-outline-secondary">
                             <i class="bi bi-sort-numeric-down"></i> Value
                         </a>
-                        <a asp-action="Data" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.LipemicGroupSortParm" class="btn btn-outline-secondary">
+                        <a asp-action="Donations" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.LipemicGroupSortParm" class="btn btn-outline-secondary">
                             <i class="bi bi-sort-alpha-down"></i> Group
                         </a>
                     </div>
@@ -120,7 +120,7 @@
                         @if (Model.HasPreviousPage)
                         {
                             <li class="page-item">
-                                <a asp-action="Data"
+                                <a asp-action="Donations"
                                    asp-route-id="@device.Id"
                                    asp-route-sortOrder="@ViewBag.CurrentSort"
                                    asp-route-pageNumber="@(Model.PageIndex - 1)"
@@ -140,7 +140,7 @@
                         @if (Model.HasNextPage)
                         {
                             <li class="page-item">
-                                <a asp-action="Data"
+                                <a asp-action="Donations"
                                    asp-route-id="@device.Id"
                                    asp-route-sortOrder="@ViewBag.CurrentSort"
                                    asp-route-pageNumber="@(Model.PageIndex + 1)"
@@ -165,7 +165,7 @@
     @if (!Model.Any())
     {
         <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> No data available for this device yet.
+            <i class="bi bi-info-circle"></i> No donation data available for this device yet.
         </div>
     }
 

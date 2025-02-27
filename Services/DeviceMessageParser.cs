@@ -30,6 +30,9 @@ namespace DeviceDataCollector.Services
         {
             try
             {
+                // Normalize separators - add any separator character you want to support
+                message = message.Replace("|", "ª").Replace("?", "ª").Replace("*", "ª");
+
                 // Clean up the message - remove any unwanted control characters but keep the separators
                 message = CleanMessage(message);
 
@@ -117,7 +120,7 @@ namespace DeviceDataCollector.Services
             return deviceStatus;
         }
 
-        private DeviceData ParseDataMessage(string message, string ipAddress, int port)
+        private DonationsData ParseDataMessage(string message, string ipAddress, int port)
         {
             // Format depends on the barcode mode, but all start with: #DªSNªvreme.timevreme.dateª
             var parts = message.Split('ª');
@@ -128,7 +131,7 @@ namespace DeviceDataCollector.Services
                 return null;
             }
 
-            var deviceData = new DeviceData
+            var donationData = new DonationsData
             {
                 DeviceId = parts[1],
                 Timestamp = ParseTimestamp(parts[2]),
@@ -142,24 +145,24 @@ namespace DeviceDataCollector.Services
             int startIndex = 3;
             if (parts[startIndex] == "B")
             {
-                deviceData.IsBarcodeMode = true;
+                donationData.IsBarcodeMode = true;
                 startIndex++; // Skip the B marker
 
                 // Extract barcode data based on position and availability
                 if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    deviceData.RefCode = parts[startIndex];
+                    donationData.RefCode = parts[startIndex];
                 startIndex++;
 
                 if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    deviceData.DonationIdBarcode = parts[startIndex];
+                    donationData.DonationIdBarcode = parts[startIndex];
                 startIndex++;
 
                 if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    deviceData.OperatorIdBarcode = parts[startIndex];
+                    donationData.OperatorIdBarcode = parts[startIndex];
                 startIndex++;
 
                 if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    deviceData.LotNumber = parts[startIndex];
+                    donationData.LotNumber = parts[startIndex];
                 startIndex++;
             }
 
@@ -168,20 +171,20 @@ namespace DeviceDataCollector.Services
             if (measurementIndex >= 0)
             {
                 if (measurementIndex + 1 < parts.Length && int.TryParse(parts[measurementIndex + 1], out int lipemicValue))
-                    deviceData.LipemicValue = lipemicValue;
+                    donationData.LipemicValue = lipemicValue;
 
                 if (measurementIndex + 2 < parts.Length)
-                    deviceData.LipemicGroup = parts[measurementIndex + 2];
+                    donationData.LipemicGroup = parts[measurementIndex + 2];
 
                 if (measurementIndex + 3 < parts.Length)
-                    deviceData.LipemicStatus = parts[measurementIndex + 3];
+                    donationData.LipemicStatus = parts[measurementIndex + 3];
             }
 
             // Extract checksum - it's the last part before the delimiter ý
             var lastPart = parts[parts.Length - 1];
-            deviceData.CheckSum = lastPart.TrimEnd('ý');
+            donationData.CheckSum = lastPart.TrimEnd('ý');
 
-            return deviceData;
+            return donationData;
         }
 
         private DateTime ParseTimestamp(string timestamp)

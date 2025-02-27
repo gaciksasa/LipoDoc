@@ -1,0 +1,174 @@
+﻿@using DeviceDataCollector.Models
+@model DonationsData
+
+@{
+    ViewData["Title"] = "Donation Details";
+}
+
+<h1>Donation Details</h1>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Donation Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Donation ID:</strong>
+            </div>
+            <div class="col-md-9">
+                @(string.IsNullOrEmpty(Model.DonationIdBarcode) ? "-" : Model.DonationIdBarcode)
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Reference Code:</strong>
+            </div>
+            <div class="col-md-9">
+                @(string.IsNullOrEmpty(Model.RefCode) ? "-" : Model.RefCode)
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Collection Date/Time:</strong>
+            </div>
+            <div class="col-md-9">
+                @Model.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Lot Number:</strong>
+            </div>
+            <div class="col-md-9">
+                @(string.IsNullOrEmpty(Model.LotNumber) ? "-" : Model.LotNumber)
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Operator:</strong>
+            </div>
+            <div class="col-md-9">
+                @(string.IsNullOrEmpty(Model.OperatorIdBarcode) ? "-" : Model.OperatorIdBarcode)
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">Lipemic Test Results</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Lipemic Value:</strong>
+            </div>
+            <div class="col-md-9">
+                @(Model.LipemicValue?.ToString() ?? "-")
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Group:</strong>
+            </div>
+            <div class="col-md-9">
+                @if (!string.IsNullOrEmpty(Model.LipemicGroup))
+                {
+                    <span class="badge @(Model.LipemicGroup == "I" ? "bg-success" :
+                                        Model.LipemicGroup == "II" ? "bg-info" :
+                                        Model.LipemicGroup == "III" ? "bg-warning" : "bg-danger")">
+                        @Model.LipemicGroup
+                    </span>
+                }
+                else
+                {
+                    <span>-</span>
+                }
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Status:</strong>
+            </div>
+            <div class="col-md-9">
+                @if (!string.IsNullOrEmpty(Model.LipemicStatus))
+                {
+                    @if (Model.LipemicStatus == "PASSED")
+                    {
+                        <span class="badge bg-success">PASSED</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">LIPEMIC</span>
+                    }
+                }
+                else
+                {
+                    <span>-</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0">Technical Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Device ID:</strong>
+            </div>
+            <div class="col-md-9">
+                @Model.DeviceId
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Message Type:</strong>
+            </div>
+            <div class="col-md-9">
+                @Model.MessageType
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-3 text-muted">
+                <strong>Source:</strong>
+            </div>
+            <div class="col-md-9">
+                @Model.IPAddress:@Model.Port
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.RawPayload))
+        {
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Raw Payload:</strong>
+                </div>
+                <div class="col-md-9">
+                    <pre class="bg-light p-2 rounded"><code>@Model.RawPayload</code></pre>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+    @if (User.IsInRole("Admin"))
+    {
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">Edit</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-danger">Delete</a>
+    }
+</div>

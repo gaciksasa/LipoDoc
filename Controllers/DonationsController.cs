@@ -7,22 +7,22 @@ using DeviceDataCollector.Models;
 namespace DeviceDataCollector.Controllers
 {
     [Authorize] // Require authentication for all actions
-    public class DeviceDataController : Controller
+    public class DonationsController : Controller
     {
         private readonly ApplicationDbContext _context;
 
-        public DeviceDataController(ApplicationDbContext context)
+        public DonationsController(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // GET: DeviceData
+        // GET: Donations
         public async Task<IActionResult> Index()
         {
-            return View(await _context.DeviceData.ToListAsync());
+            return View(await _context.DonationsData.ToListAsync());
         }
 
-        // GET: DeviceData/Details/5
+        // GET: Donations/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -30,37 +30,37 @@ namespace DeviceDataCollector.Controllers
                 return NotFound();
             }
 
-            var deviceData = await _context.DeviceData
+            var donationData = await _context.DonationsData
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (deviceData == null)
+            if (donationData == null)
             {
                 return NotFound();
             }
 
-            return View(deviceData);
+            return View(donationData);
         }
 
-        // GET: DeviceData/Create
+        // GET: Donations/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: DeviceData/Create
+        // POST: Donations/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DeviceData deviceData)
+        public async Task<IActionResult> Create([Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DonationsData donationData)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(deviceData);
+                _context.Add(donationData);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            return View(deviceData);
+            return View(donationData);
         }
 
-        // GET: DeviceData/Edit/5
+        // GET: Donations/Edit/5
         [Authorize(Policy = "RequireAdminRole")] // Only admins can edit
         public async Task<IActionResult> Edit(int? id)
         {
@@ -69,21 +69,21 @@ namespace DeviceDataCollector.Controllers
                 return NotFound();
             }
 
-            var deviceData = await _context.DeviceData.FindAsync(id);
-            if (deviceData == null)
+            var donationData = await _context.DonationsData.FindAsync(id);
+            if (donationData == null)
             {
                 return NotFound();
             }
-            return View(deviceData);
+            return View(donationData);
         }
 
-        // POST: DeviceData/Edit/5
+        // POST: Donations/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Policy = "RequireAdminRole")] // Only admins can edit
-        public async Task<IActionResult> Edit(int id, [Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DeviceData deviceData)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DonationsData donationData)
         {
-            if (id != deviceData.Id)
+            if (id != donationData.Id)
             {
                 return NotFound();
             }
@@ -92,12 +92,12 @@ namespace DeviceDataCollector.Controllers
             {
                 try
                 {
-                    _context.Update(deviceData);
+                    _context.Update(donationData);
                     await _context.SaveChangesAsync();
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!DeviceDataExists(deviceData.Id))
+                    if (!DonationsDataExists(donationData.Id))
                     {
                         return NotFound();
                     }
@@ -108,10 +108,10 @@ namespace DeviceDataCollector.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            return View(deviceData);
+            return View(donationData);
         }
 
-        // GET: DeviceData/Delete/5
+        // GET: Donations/Delete/5
         [Authorize(Policy = "RequireAdminRole")] // Only admins can delete
         public async Task<IActionResult> Delete(int? id)
         {
@@ -120,26 +120,26 @@ namespace DeviceDataCollector.Controllers
                 return NotFound();
             }
 
-            var deviceData = await _context.DeviceData
+            var donationData = await _context.DonationsData
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (deviceData == null)
+            if (donationData == null)
             {
                 return NotFound();
             }
 
-            return View(deviceData);
+            return View(donationData);
         }
 
-        // POST: DeviceData/Delete/5
+        // POST: Donations/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         [Authorize(Policy = "RequireAdminRole")] // Only admins can delete
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var deviceData = await _context.DeviceData.FindAsync(id);
-            if (deviceData != null)
+            var donationData = await _context.DonationsData.FindAsync(id);
+            if (donationData != null)
             {
-                _context.DeviceData.Remove(deviceData);
+                _context.DonationsData.Remove(donationData);
             }
 
             await _context.SaveChangesAsync();
@@ -149,13 +149,13 @@ namespace DeviceDataCollector.Controllers
         [HttpGet]
         public async Task<IActionResult> GetCount()
         {
-            int count = await _context.DeviceData.CountAsync();
+            int count = await _context.DonationsData.CountAsync();
             return Json(count);
         }
 
-        private bool DeviceDataExists(int id)
+        private bool DonationsDataExists(int id)
         {
-            return _context.DeviceData.Any(e => e.Id == id);
+            return _context.DonationsData.Any(e => e.Id == id);
         }
     }
 }

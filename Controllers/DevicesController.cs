@@ -55,7 +55,7 @@ namespace DeviceDataCollector.Controllers
             ViewBag.LatestStatus = latestStatus;
 
             // Get count of readings for this device
-            var readingsCount = await _context.DeviceData
+            var readingsCount = await _context.DonationsData
                 .Where(d => d.DeviceId == device.SerialNumber)
                 .CountAsync();
 
@@ -128,8 +128,8 @@ namespace DeviceDataCollector.Controllers
             return View(device);
         }
 
-        // GET: Devices/Data/5
-        public async Task<IActionResult> Data(int? id, string sortOrder, string searchString, int? pageNumber)
+        // GET: Devices/Donations/5
+        public async Task<IActionResult> Donations(int? id, string sortOrder, string searchString, int? pageNumber)
         {
             if (id == null)
             {
@@ -150,7 +150,7 @@ namespace DeviceDataCollector.Controllers
 
             var pageSize = 20;
 
-            var query = _context.DeviceData
+            var query = _context.DonationsData
                 .Where(d => d.DeviceId == device.SerialNumber && d.MessageType == "#D")
                 .AsQueryable();
 
@@ -185,7 +185,7 @@ namespace DeviceDataCollector.Controllers
                     break;
             }
 
-            return View(await PaginatedList<DeviceData>.CreateAsync(query, pageNumber ?? 1, pageSize));
+            return View(await PaginatedList<DonationsData>.CreateAsync(query, pageNumber ?? 1, pageSize));
         }
 
         private bool DeviceExists(int id)

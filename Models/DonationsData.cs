@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DeviceDataCollector.Models
 {
-    public class DeviceData
+    public class DonationsData
     {
         [Key]
         public int Id { get; set; }

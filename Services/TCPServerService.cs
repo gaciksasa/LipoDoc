@@ -137,14 +137,14 @@ namespace DeviceDataCollector.Services
                         // Also check if we have the device registered
                         await EnsureDeviceRegisteredAsync(dbContext, status.DeviceId);
                     }
-                    else if (parsedMessage is DeviceData deviceData)
+                    else if (parsedMessage is DonationsData donationData)
                     {
-                        dbContext.DeviceData.Add(deviceData);
+                        dbContext.DonationsData.Add(donationData);
                         await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"Data from {ipAddress}:{port} stored in database");
+                        _logger.LogInformation($"Donation data from {ipAddress}:{port} stored in database");
 
                         // Also check if we have the device registered
-                        await EnsureDeviceRegisteredAsync(dbContext, deviceData.DeviceId);
+                        await EnsureDeviceRegisteredAsync(dbContext, donationData.DeviceId);
                     }
                 }
             }

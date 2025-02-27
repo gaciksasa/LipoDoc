@@ -3,7 +3,7 @@
 }
 
 <div class="text-center">
-    <h1 class="display-4">Device Data Collector</h1>
+    <h1 class="display-4">Blood Donation Data Collector</h1>
     <p>TCP/IP server is running and collecting data from connected devices.</p>
 
     <div class="row mt-4">
@@ -33,7 +33,7 @@
                     </p>
 
                     <p>
-                        <strong>Total Records:</strong>
+                        <strong>Total Donations:</strong>
                         @if (ViewBag.DatabaseConnected)
                         {
                             <span id="recordCount">Loading...</span>
@@ -47,11 +47,11 @@
                 <div class="card-footer">
                     @if (ViewBag.DatabaseConnected)
                     {
-                        <a asp-controller="DeviceData" asp-action="Index" class="btn btn-primary">View Collected Data</a>
+                        <a asp-controller="Donations" asp-action="Index" class="btn btn-primary">View Donations</a>
                     }
                     else
                     {
-                        <a href="#" class="btn btn-primary disabled">View Collected Data</a>
+                        <a href="#" class="btn btn-primary disabled">View Donations</a>
                     }
                 </div>
             </div>
@@ -63,7 +63,7 @@
     <script>
         // Simple function to update record count
         function updateRecordCount() {
-            fetch('/DeviceData/GetCount')
+            fetch('/Donations/GetCount')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok');

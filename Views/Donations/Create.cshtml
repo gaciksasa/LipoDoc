@@ -1,0 +1,132 @@
+﻿@using DeviceDataCollector.Models
+@model DonationsData
+
+@{
+    ViewData["Title"] = "Create Donation";
+}
+
+<h1>Create New Donation Record</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Donation Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="DonationIdBarcode" class="form-label">Donation ID</label>
+                        <input asp-for="DonationIdBarcode" class="form-control" />
+                        <span asp-validation-for="DonationIdBarcode" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="RefCode" class="form-label">Reference Code</label>
+                        <input asp-for="RefCode" class="form-control" />
+                        <span asp-validation-for="RefCode" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Timestamp" class="form-label">Date/Time</label>
+                        <input asp-for="Timestamp" class="form-control" type="datetime-local" value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" />
+                        <span asp-validation-for="Timestamp" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="LotNumber" class="form-label">Lot Number</label>
+                        <input asp-for="LotNumber" class="form-control" />
+                        <span asp-validation-for="LotNumber" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="OperatorIdBarcode" class="form-label">Operator ID</label>
+                        <input asp-for="OperatorIdBarcode" class="form-control" />
+                        <span asp-validation-for="OperatorIdBarcode" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Lipemic Test Results</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="LipemicValue" class="form-label">Lipemic Value</label>
+                        <input asp-for="LipemicValue" class="form-control" />
+                        <span asp-validation-for="LipemicValue" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="LipemicGroup" class="form-label">Lipemic Group</label>
+                        <select asp-for="LipemicGroup" class="form-select">
+                            <option value="">-- Select Group --</option>
+                            <option value="I">I</option>
+                            <option value="II">II</option>
+                            <option value="III">III</option>
+                            <option value="IV">IV</option>
+                        </select>
+                        <span asp-validation-for="LipemicGroup" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="LipemicStatus" class="form-label">Status</label>
+                        <select asp-for="LipemicStatus" class="form-select">
+                            <option value="">-- Select Status --</option>
+                            <option value="PASSED">PASSED</option>
+                            <option value="LIPEMIC">LIPEMIC</option>
+                        </select>
+                        <span asp-validation-for="LipemicStatus" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Device Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="DeviceId" class="form-label">Device ID</label>
+                        <input asp-for="DeviceId" class="form-control" />
+                        <span asp-validation-for="DeviceId" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="MessageType" class="form-label">Message Type</label>
+                        <input asp-for="MessageType" class="form-control" value="#D" />
+                        <span asp-validation-for="MessageType" class="text-danger"></span>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="IPAddress" class="form-label">IP Address</label>
+                            <input asp-for="IPAddress" class="form-control" value="127.0.0.1" />
+                            <span asp-validation-for="IPAddress" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Port" class="form-label">Port</label>
+                            <input asp-for="Port" class="form-control" value="0" />
+                            <span asp-validation-for="Port" class="text-danger"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

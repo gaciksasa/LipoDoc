@@ -10,7 +10,7 @@ namespace DeviceDataCollector.Data
         {
         }
 
-        public DbSet<DeviceData> DeviceData { get; set; }
+        public DbSet<DonationsData> DonationsData { get; set; }
         public DbSet<DeviceStatus> DeviceStatuses { get; set; }
         public DbSet<Device> Devices { get; set; }
         public DbSet<User> Users { get; set; }
@@ -20,13 +20,13 @@ namespace DeviceDataCollector.Data
             base.OnModelCreating(modelBuilder);
 
             // Configure indexes for better performance
-            modelBuilder.Entity<DeviceData>()
+            modelBuilder.Entity<DonationsData>()
                 .HasIndex(d => d.DeviceId);
 
-            modelBuilder.Entity<DeviceData>()
+            modelBuilder.Entity<DonationsData>()
                 .HasIndex(d => d.Timestamp);
 
-            modelBuilder.Entity<DeviceData>()
+            modelBuilder.Entity<DonationsData>()
                 .HasIndex(d => d.DonationIdBarcode);
 
             modelBuilder.Entity<DeviceStatus>()
