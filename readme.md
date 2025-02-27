@@ -1,4 +1,61 @@
-## Authentication and Authorization
+## Database Schema
+
+The application uses the following database schema:
+
+### DeviceData
+Stores the lipemic test results from blood donation devices:
+- ID (auto-generated primary key)
+- DeviceId (serial number of the device)
+- Timestamp (when data was received)
+- MessageType (the type of message: "#S", "#D", etc.)
+- RawPayload (the raw message content)
+- IPAddress (source IP)
+- Port (source port)
+- DeviceStatus (0=IDLE, 1=Process in progress, 2=Process completed)
+- AvailableData (number of readings buffered in the device)
+- IsBarcodeMode (whether barcode mode is enabled)
+- RefCode (reference code barcode)
+- DonationIdBarcode (donation ID barcode)
+- OperatorIdBarcode (operator ID barcode)
+- LotNumber (lot number barcode)
+- LipemicValue (value of lipemic reading)
+- LipemicGroup (lipemic group: I, II, III, or IV)
+- LipemicStatus (LIPEMIC or PASSED)
+- CheckSum (checksum from the device)
+
+### DeviceStatus
+Stores the status updates from devices:
+- ID (auto-generated primary key)
+- DeviceId (serial number of the device)
+- Timestamp (when status was received)
+- Status (0=IDLE, 1=Process in progress, 2=Process completed)
+- AvailableData (number of readings buffered in the device)
+- RawPayload (the raw message content)
+- IPAddress (source IP)
+- Port (source port)
+- CheckSum (checksum from the device)
+
+### Device
+Stores information about registered devices:
+- ID (auto-generated primary key)
+- SerialNumber (unique identifier for the device)
+- Name (friendly name for the device)
+- Location (location of the device)
+- LastConnectionTime (last time the device connected)
+- RegisteredDate (when the device was first registered)
+- IsActive (whether the device is active)
+- Notes (additional notes about the device)
+
+### Users
+Stores user authentication information:
+- ID (auto-generated primary key)
+- Username (unique username)
+- PasswordHash (hashed password)
+- Role (Admin or User)
+- FullName (full name of the user)
+- Email (email address)
+- CreatedAt (when the user was created)
+- LastLogin (last login time)## Authentication and Authorization
 
 The application includes a role-based authentication system with two predefined roles:
 

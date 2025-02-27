@@ -1,4 +1,5 @@
-﻿@model IEnumerable<DeviceData>
+﻿@using DeviceDataCollector.Models
+@model IEnumerable<DeviceData>
 
 @{
     ViewData["Title"] = "Device Data";
@@ -21,7 +22,7 @@
                     @Html.DisplayNameFor(model => model.Timestamp)
                 </th>
                 <th>
-                    @Html.DisplayNameFor(model => model.DataPayload)
+                    @Html.DisplayNameFor(model => model.RawPayload)
                 </th>
                 <th>
                     @Html.DisplayNameFor(model => model.IPAddress)
@@ -43,7 +44,7 @@
                         @Html.DisplayFor(modelItem => item.Timestamp)
                     </td>
                     <td class="text-truncate" style="max-width: 300px;">
-                        @Html.DisplayFor(modelItem => item.DataPayload)
+                        @Html.DisplayFor(modelItem => item.RawPayload)
                     </td>
                     <td>
                         @Html.DisplayFor(modelItem => item.IPAddress)

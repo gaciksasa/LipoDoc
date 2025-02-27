@@ -1,7 +1,6 @@
 using DeviceDataCollector.Data;
 using DeviceDataCollector.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,13 +39,14 @@ builder.Services.AddSingleton<TCPServerService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPServerService>());
 builder.Services.AddScoped<DatabaseStatusService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<DeviceMessageParser>();
 
 // Add BCrypt
 builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 
 var app = builder.Build();
 
-// Try to initialize the database, but continue even if it fails
+// Initialize database
 try
 {
     using (var scope = app.Services.CreateScope())
@@ -56,17 +56,49 @@ try
 
         logger.LogInformation("Checking database existence and applying migrations if needed...");
 
-        // This will create the database if it doesn't exist and apply any pending migrations
-        await dbContext.Database.MigrateAsync();
+        // Ensure database exists
+        dbContext.Database.EnsureCreated();
 
-        logger.LogInformation("Database check complete - database is ready");
+        // Apply any pending migrations
+        dbContext.Database.Migrate();
+
+        // Verify that the Devices table exists
+        bool devicesTableExists = false;
+        try
+        {
+            // Try to access the Devices table to verify it exists
+            devicesTableExists = dbContext.Devices.Any();
+            logger.LogInformation("Devices table exists and is accessible");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error accessing Devices table. It may not exist.");
+        }
+
+        // If the table doesn't exist, try creating it manually
+        if (!devicesTableExists)
+        {
+            logger.LogWarning("Devices table not found. Attempting to create it...");
+            try
+            {
+                // Force the creation of all tables again
+                dbContext.Database.EnsureDeleted();
+                dbContext.Database.EnsureCreated();
+                logger.LogInformation("Database recreated with all tables");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to recreate database");
+            }
+        }
+
+        logger.LogInformation("Database initialization completed");
     }
 }
 catch (Exception ex)
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
     logger.LogError(ex, "An error occurred while initializing the database. Application will continue, but database features may not work.");
-    // Continue execution even if database initialization fails
 }
 
 // Configure the HTTP request pipeline.

@@ -1,0 +1,218 @@
+﻿@model DeviceDataCollector.Models.Device
+
+@{
+    ViewData["Title"] = "Device Details";
+    var latestStatus = ViewBag.LatestStatus as DeviceDataCollector.Models.DeviceStatus;
+    var readingsCount = ViewBag.ReadingsCount;
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Index">Devices</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">@Model.SerialNumber</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Device Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Serial Number</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @Model.SerialNumber
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Name</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @Model.Name
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Location</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @(string.IsNullOrEmpty(Model.Location) ? "-" : Model.Location)
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Status</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @if (Model.IsActive)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactive</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Registered</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @Model.RegisteredDate.ToString("yyyy-MM-dd HH:mm:ss")
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>Last Connection</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @if (Model.LastConnectionTime.HasValue)
+                            {
+                                @Model.LastConnectionTime.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                            }
+                            else
+                            {
+                                <span>Never</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.Notes))
+                    {
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Notes</strong>
+                            </div>
+                            <div class="col-md-8">
+                                @Model.Notes
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                        <div>
+                            <a asp-action="Data" asp-route-id="@Model.Id" class="btn btn-primary">
+                                <i class="bi bi-file-text"></i> View Data
+                            </a>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Current Status</h5>
+                </div>
+                <div class="card-body">
+                    @if (latestStatus != null)
+                    {
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Last Update</strong>
+                            </div>
+                            <div class="col-md-8">
+                                @latestStatus.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Device Status</strong>
+                            </div>
+                            <div class="col-md-8">
+                                @switch (latestStatus.Status)
+                                {
+                                    case 0:
+                                        <span class="badge bg-secondary">IDLE</span>
+                                        break;
+                                    case 1:
+                                        <span class="badge bg-primary">Process in Progress</span>
+                                        break;
+                                    case 2:
+                                        <span class="badge bg-success">Process Completed</span>
+                                        break;
+                                    default:
+                                        <span class="badge bg-warning">Unknown (@latestStatus.Status)</span>
+                                        break;
+                                }
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Available Data</strong>
+                            </div>
+                            <div class="col-md-8">
+                                @latestStatus.AvailableData readings
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>IP Address</strong>
+                            </div>
+                            <div class="col-md-8">
+                                @latestStatus.IPAddress:@latestStatus.Port
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            No status information available for this device yet.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Data Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6 text-muted">
+                            <strong>Total Readings</strong>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>@readingsCount</h4>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a asp-action="Data" asp-route-id="@Model.Id" class="btn btn-primary">
+                            <i class="bi bi-file-text"></i> View Complete Data
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

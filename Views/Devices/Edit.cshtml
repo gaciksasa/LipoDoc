@@ -1,0 +1,69 @@
+﻿@model DeviceDataCollector.Models.Device
+
+@{
+    ViewData["Title"] = "Edit Device";
+}
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">Edit Device</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Edit">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        <input type="hidden" asp-for="Id" />
+
+                        <div class="mb-3">
+                            <label asp-for="SerialNumber" class="form-label">Serial Number</label>
+                            <input asp-for="SerialNumber" class="form-control" readonly />
+                            <span asp-validation-for="SerialNumber" class="text-danger"></span>
+                            <div class="form-text">Serial number cannot be changed</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Name" class="form-label">Friendly Name</label>
+                            <input asp-for="Name" class="form-control" />
+                            <span asp-validation-for="Name" class="text-danger"></span>
+                            <div class="form-text">A descriptive name for this device</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Location" class="form-label">Location</label>
+                            <input asp-for="Location" class="form-control" />
+                            <span asp-validation-for="Location" class="text-danger"></span>
+                            <div class="form-text">Where this device is located</div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input asp-for="IsActive" class="form-check-input" />
+                            <label asp-for="IsActive" class="form-check-label">Device is active</label>
+                            <span asp-validation-for="IsActive" class="text-danger"></span>
+                            <div class="form-text">Inactive devices will still receive data but will be marked as inactive in the UI</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Notes" class="form-label">Notes</label>
+                            <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                            <div class="form-text">Additional notes about this device</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-warning">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

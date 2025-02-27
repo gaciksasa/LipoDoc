@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using DeviceDataCollector.Models;
-using Microsoft.CodeAnalysis.Scripting;
 
 namespace DeviceDataCollector.Data
 {
@@ -12,11 +11,29 @@ namespace DeviceDataCollector.Data
         }
 
         public DbSet<DeviceData> DeviceData { get; set; }
+        public DbSet<DeviceStatus> DeviceStatuses { get; set; }
+        public DbSet<Device> Devices { get; set; }
         public DbSet<User> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Configure indexes for better performance
+            modelBuilder.Entity<DeviceData>()
+                .HasIndex(d => d.DeviceId);
+
+            modelBuilder.Entity<DeviceData>()
+                .HasIndex(d => d.Timestamp);
+
+            modelBuilder.Entity<DeviceData>()
+                .HasIndex(d => d.DonationIdBarcode);
+
+            modelBuilder.Entity<DeviceStatus>()
+                .HasIndex(d => d.DeviceId);
+
+            modelBuilder.Entity<DeviceStatus>()
+                .HasIndex(d => d.Timestamp);
 
             // Seed admin and user accounts
             modelBuilder.Entity<User>().HasData(
@@ -24,8 +41,7 @@ namespace DeviceDataCollector.Data
                 {
                     Id = 1,
                     Username = "admin",
-                    // In production, use a proper password hashing mechanism
-                    // This is a simple hash of "admin123" for demonstration
+                    // Pre-hashed password for "admin123" 
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
                     Role = "Admin",
                     FullName = "Administrator",
@@ -36,7 +52,7 @@ namespace DeviceDataCollector.Data
                 {
                     Id = 2,
                     Username = "user",
-                    // Simple hash of "user123"
+                    // Pre-hashed password for "user123"
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword("user123"),
                     Role = "User",
                     FullName = "Regular User",

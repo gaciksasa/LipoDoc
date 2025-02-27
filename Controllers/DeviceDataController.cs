@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using DeviceDataCollector.Data;
 using Microsoft.AspNetCore.Authorization;
+using DeviceDataCollector.Models;
 
 namespace DeviceDataCollector.Controllers
 {

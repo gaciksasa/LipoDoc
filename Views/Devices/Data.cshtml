@@ -1,0 +1,175 @@
+﻿@model DeviceDataCollector.Controllers.PaginatedList<DeviceDataCollector.Models.DeviceData>
+
+@{
+    var device = ViewBag.Device as DeviceDataCollector.Models.Device;
+    ViewData["Title"] = $"Data for {device.Name}";
+}
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Index">Devices</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@device.Id">@device.SerialNumber</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Data</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Device Data: @device.Name (@device.SerialNumber)</h5>
+        </div>
+        <div class="card-header bg-light">
+            <form asp-action="Data" method="get" class="row g-3">
+                <input type="hidden" name="id" value="@device.Id" />
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Search barcode data..." name="searchString" value="@ViewBag.CurrentFilter">
+                        <button class="btn btn-outline-secondary" type="submit">Search</button>
+                        <a asp-action="Data" asp-route-id="@device.Id" class="btn btn-outline-secondary">Clear</a>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group" role="group">
+                        <a asp-action="Data" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.TimestampSortParm" class="btn btn-outline-secondary">
+                            <i class="bi bi-clock"></i> Date
+                        </a>
+                        <a asp-action="Data" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.LipemicValueSortParm" class="btn btn-outline-secondary">
+                            <i class="bi bi-sort-numeric-down"></i> Value
+                        </a>
+                        <a asp-action="Data" asp-route-id="@device.Id" asp-route-sortOrder="@ViewBag.LipemicGroupSortParm" class="btn btn-outline-secondary">
+                            <i class="bi bi-sort-alpha-down"></i> Group
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Donation ID</th>
+                            <th>Ref Code</th>
+                            <th>Operator</th>
+                            <th>Lot Number</th>
+                            <th>Lipemic Value</th>
+                            <th>Group</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>@item.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@(string.IsNullOrEmpty(item.DonationIdBarcode) ? "-" : item.DonationIdBarcode)</td>
+                                <td>@(string.IsNullOrEmpty(item.RefCode) ? "-" : item.RefCode)</td>
+                                <td>@(string.IsNullOrEmpty(item.OperatorIdBarcode) ? "-" : item.OperatorIdBarcode)</td>
+                                <td>@(string.IsNullOrEmpty(item.LotNumber) ? "-" : item.LotNumber)</td>
+                                <td>@(item.LipemicValue?.ToString() ?? "-")</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.LipemicGroup))
+                                    {
+                                        <span class="badge @(item.LipemicGroup == "I" ? "bg-success" :
+                                                           item.LipemicGroup == "II" ? "bg-info" :
+                                                           item.LipemicGroup == "III" ? "bg-warning" : "bg-danger")">
+                                            @item.LipemicGroup
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span>-</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.LipemicStatus))
+                                    {
+                                        @if (item.LipemicStatus == "PASSED")
+                                        {
+                                            <span class="badge bg-success">PASSED</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">LIPEMIC</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span>-</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    Page @Model.PageIndex of @Model.TotalPages
+                </div>
+                <div>
+                    <ul class="pagination mb-0">
+                        @if (Model.HasPreviousPage)
+                        {
+                            <li class="page-item">
+                                <a asp-action="Data"
+                                   asp-route-id="@device.Id"
+                                   asp-route-sortOrder="@ViewBag.CurrentSort"
+                                   asp-route-pageNumber="@(Model.PageIndex - 1)"
+                                   asp-route-searchString="@ViewBag.CurrentFilter"
+                                   class="page-link">
+                                    Previous
+                                </a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="page-item disabled">
+                                <span class="page-link">Previous</span>
+                            </li>
+                        }
+
+                        @if (Model.HasNextPage)
+                        {
+                            <li class="page-item">
+                                <a asp-action="Data"
+                                   asp-route-id="@device.Id"
+                                   asp-route-sortOrder="@ViewBag.CurrentSort"
+                                   asp-route-pageNumber="@(Model.PageIndex + 1)"
+                                   asp-route-searchString="@ViewBag.CurrentFilter"
+                                   class="page-link">
+                                    Next
+                                </a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="page-item disabled">
+                                <span class="page-link">Next</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No data available for this device yet.
+        </div>
+    }
+
+    <div class="mb-4">
+        <a asp-action="Details" asp-route-id="@device.Id" class="btn btn-secondary">Back to Device Details</a>
+    </div>
+</div>
