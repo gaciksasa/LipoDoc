@@ -1,11 +1,31 @@
 using DeviceDataCollector.Data;
 using DeviceDataCollector.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Add authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/AccessDenied";
+    });
+
+// Add authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("RequireUserRole", policy => policy.RequireRole("User", "Admin"));
+});
 
 // Add database context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -19,6 +39,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddSingleton<TCPServerService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPServerService>());
 builder.Services.AddScoped<DatabaseStatusService>();
+builder.Services.AddScoped<AuthService>();
+
+// Add BCrypt
+builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 
 var app = builder.Build();
 
@@ -57,6 +81,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(

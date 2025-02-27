@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DeviceDataCollector.Data;
+using Microsoft.AspNetCore.Authorization;
 
 namespace DeviceDataCollector.Controllers
 {
+    [Authorize] // Require authentication for all actions
     public class DeviceDataController : Controller
     {
         private readonly ApplicationDbContext _context;
@@ -49,8 +46,6 @@ namespace DeviceDataCollector.Controllers
         }
 
         // POST: DeviceData/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DeviceData deviceData)
@@ -65,6 +60,7 @@ namespace DeviceDataCollector.Controllers
         }
 
         // GET: DeviceData/Edit/5
+        [Authorize(Policy = "RequireAdminRole")] // Only admins can edit
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -81,10 +77,9 @@ namespace DeviceDataCollector.Controllers
         }
 
         // POST: DeviceData/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "RequireAdminRole")] // Only admins can edit
         public async Task<IActionResult> Edit(int id, [Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DeviceData deviceData)
         {
             if (id != deviceData.Id)
@@ -116,6 +111,7 @@ namespace DeviceDataCollector.Controllers
         }
 
         // GET: DeviceData/Delete/5
+        [Authorize(Policy = "RequireAdminRole")] // Only admins can delete
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -136,6 +132,7 @@ namespace DeviceDataCollector.Controllers
         // POST: DeviceData/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "RequireAdminRole")] // Only admins can delete
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var deviceData = await _context.DeviceData.FindAsync(id);

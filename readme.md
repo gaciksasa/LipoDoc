@@ -1,4 +1,24 @@
-# Device Data Collector
+## Authentication and Authorization
+
+The application includes a role-based authentication system with two predefined roles:
+
+1. **Admin Role**
+   - Full access to all features
+   - Can view, add, edit, and delete data
+   - Username: `admin`, Password: `admin123`
+
+2. **User Role**
+   - Limited access to application features
+   - Can view and add data but cannot edit or delete
+   - Username: `user`, Password: `user123`
+
+### Security Features
+
+- Password hashing using BCrypt
+- Cookie-based authentication
+- Role-based authorization policies
+- Secure routing with authorization attributes
+- Protected views that adapt based on user role# Device Data Collector
 
 A .NET 8 web application for collecting, storing, and managing data from TCP/IP devices.
 
@@ -53,16 +73,17 @@ Database and TCP server settings can be configured in `appsettings.json`:
 1. Clone the repository
 2. Update the database connection string in `appsettings.json`
 3. Configure the required loopback IP addresses (127.0.0.2 and 127.0.0.3) as described in the "Configuring Additional Local IP Addresses" section below
-4. Apply database migrations:
-   ```
-   dotnet ef database update
-   ```
-5. Run the application:
+4. Run the application:
    ```
    dotnet run
    ```
 
-The application will start, and the TCP server will begin listening on the configured IP address (127.0.0.2) and port (5000).
+The application will:
+- Automatically create the database and tables if they don't exist
+- Apply any pending migrations
+- Start the TCP server listening on the configured IP address (127.0.0.2) and port (5000)
+
+> Note: Manual migration using `dotnet ef database update` is no longer required as the application handles this automatically at startup.
 
 ## Key Components
 
@@ -178,13 +199,24 @@ Here's how to add these addresses:
 
 ## Database Management
 
-The project uses Entity Framework Core with a Code-First approach. To manage database migrations:
+The project uses Entity Framework Core with a Code-First approach and automatically handles database creation and migration at startup.
+
+### Automatic Database Initialization
+
+The application now includes a `DatabaseInitializer` service that:
+- Creates the database if it doesn't exist
+- Applies any pending migrations automatically
+- Logs the database initialization process
+
+### Managing Migrations
+
+For development purposes, you can still manage migrations manually:
 
 ```bash
-# Add a new migration
+# Add a new migration after model changes
 dotnet ef migrations add MigrationName
 
-# Update the database to the latest migration
+# Apply migrations manually (not required for normal operation)
 dotnet ef database update
 ```
 

@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Net.Sockets;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 namespace DeviceDataCollector.Controllers
 {
+    [Authorize] // Require authentication for all actions
     public class DeviceController : Controller
     {
         private readonly ILogger<DeviceController> _logger;
