@@ -128,6 +128,100 @@ namespace DeviceDataCollector.Controllers
             return View(device);
         }
 
+        // GET: Devices/Delete/5
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var device = await _context.Devices
+                .FirstOrDefaultAsync(m => m.Id == id);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            // Get count of associated data
+            var dataCount = await _context.DonationsData
+                .Where(d => d.DeviceId == device.SerialNumber)
+                .CountAsync();
+
+            var statusCount = await _context.DeviceStatuses
+                .Where(s => s.DeviceId == device.SerialNumber)
+                .CountAsync();
+
+            ViewBag.DataCount = dataCount;
+            ViewBag.StatusCount = statusCount;
+
+            return View(device);
+        }
+
+        // POST: Devices/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            var device = await _context.Devices.FindAsync(id);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            try
+            {
+                // Track what's being deleted for logging
+                string serialNumber = device.SerialNumber;
+                string deviceName = device.Name;
+
+                // Option to cascade delete related data
+                bool deleteRelatedData = Request.Form.ContainsKey("deleteRelatedData");
+
+                if (deleteRelatedData)
+                {
+                    // Delete related donations data
+                    var donationData = await _context.DonationsData
+                        .Where(d => d.DeviceId == device.SerialNumber)
+                        .ToListAsync();
+
+                    if (donationData.Any())
+                    {
+                        _context.DonationsData.RemoveRange(donationData);
+                        _logger.LogInformation($"Deleted {donationData.Count} donation records for device {serialNumber}");
+                    }
+
+                    // Delete related status data
+                    var statusData = await _context.DeviceStatuses
+                        .Where(s => s.DeviceId == device.SerialNumber)
+                        .ToListAsync();
+
+                    if (statusData.Any())
+                    {
+                        _context.DeviceStatuses.RemoveRange(statusData);
+                        _logger.LogInformation($"Deleted {statusData.Count} status records for device {serialNumber}");
+                    }
+                }
+
+                // Delete the device
+                _context.Devices.Remove(device);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Device {serialNumber} ({deviceName}) deleted by {User.Identity.Name}");
+
+                TempData["SuccessMessage"] = $"Device {serialNumber} was successfully deleted.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting device {device.SerialNumber}");
+                TempData["ErrorMessage"] = $"Error deleting device: {ex.Message}";
+                return RedirectToAction(nameof(Delete), new { id = id });
+            }
+        }
+
         // GET: Devices/Donations/5
         public async Task<IActionResult> Donations(int? id, string sortOrder, string searchString, int? pageNumber)
         {

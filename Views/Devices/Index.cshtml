@@ -7,6 +7,13 @@
 <div class="container">
     <h1 class="mb-4">Connected Devices</h1>
 
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+        </div>
+    }
+
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
             <h5 class="mb-0">Device List</h5>
@@ -60,13 +67,16 @@
                                         <a asp-action="Details" asp-route-id="@device.Id" class="btn btn-sm btn-info">
                                             <i class="bi bi-info-circle"></i> Details
                                         </a>
-                                        <a asp-action="Data" asp-route-id="@device.Id" class="btn btn-sm btn-primary">
-                                            <i class="bi bi-file-text"></i> View Data
+                                        <a asp-action="Donations" asp-route-id="@device.Id" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-droplet"></i> Donations
                                         </a>
                                         @if (User.IsInRole("Admin"))
                                         {
                                             <a asp-action="Edit" asp-route-id="@device.Id" class="btn btn-sm btn-warning">
                                                 <i class="bi bi-pencil"></i> Edit
+                                            </a>
+                                            <a asp-action="Delete" asp-route-id="@device.Id" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-trash"></i> Delete
                                             </a>
                                         }
                                     </div>

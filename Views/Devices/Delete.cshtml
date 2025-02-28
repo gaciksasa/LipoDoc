@@ -1,0 +1,136 @@
+﻿@model DeviceDataCollector.Models.Device
+
+@{
+    ViewData["Title"] = "Delete Device";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Index">Devices</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@Model.Id">@Model.SerialNumber</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Delete</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> @TempData["ErrorMessage"]
+            </div>
+    }
+
+    <div class="card border-danger mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">Delete Device</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Warning!</strong> Are you sure you want to delete this device? This action cannot be undone.
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Serial Number:</strong>
+                </div>
+                <div class="col-md-9">
+                    @Model.SerialNumber
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Name:</strong>
+                </div>
+                <div class="col-md-9">
+                    @Model.Name
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Location:</strong>
+                </div>
+                <div class="col-md-9">
+                    @(string.IsNullOrEmpty(Model.Location) ? "-" : Model.Location)
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Status:</strong>
+                </div>
+                <div class="col-md-9">
+                    @if (Model.IsActive)
+                    {
+                            <span class="badge bg-success">Active</span>
+                    }
+                    else
+                    {
+                            <span class="badge bg-secondary">Inactive</span>
+                    }
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Registered:</strong>
+                </div>
+                <div class="col-md-9">
+                    @Model.RegisteredDate.ToString("yyyy-MM-dd HH:mm:ss")
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-3 text-muted">
+                    <strong>Last Connection:</strong>
+                </div>
+                <div class="col-md-9">
+                    @if (Model.LastConnectionTime.HasValue)
+                    {
+                        @Model.LastConnectionTime.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                    }
+                    else
+                    {
+                            <span>Never</span>
+                    }
+                </div>
+            </div>
+
+            <div class="alert alert-danger mt-4">
+                <div class="row mb-2">
+                    <div class="col-md-3 text-muted">
+                        <strong>Associated Data:</strong>
+                    </div>
+                    <div class="col-md-9">
+                        <span class="fw-bold">@ViewBag.DataCount</span> donation records and <span class="fw-bold">@ViewBag.StatusCount</span> status records
+                    </div>
+                </div>
+            </div>
+
+            <form asp-action="Delete" method="post">
+                <input type="hidden" asp-for="Id" />
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="deleteRelatedData" name="deleteRelatedData" value="true">
+                    <label class="form-check-label" for="deleteRelatedData">
+                        Also delete all associated donation and status records
+                    </label>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Device
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
