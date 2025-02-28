@@ -29,20 +29,21 @@ namespace DeviceDataCollector.Services
             _configuration = configuration;
 
             // Get ping configuration from appsettings.json or use defaults
+            // Using very short intervals for rapid status changes
             _pingInterval = TimeSpan.FromSeconds(
-                configuration.GetValue<int>("DevicePing:IntervalSeconds", 60));
+                configuration.GetValue<int>("DevicePing:IntervalSeconds", 10)); // Reduced to 10 seconds
             _pingPort = configuration.GetValue<int>("DevicePing:Port", 5000);
-            _pingTimeout = configuration.GetValue<int>("DevicePing:TimeoutMs", 2000);
-            _maxFailuresBeforeInactive = configuration.GetValue<int>("DevicePing:MaxFailuresBeforeInactive", 3);
+            _pingTimeout = configuration.GetValue<int>("DevicePing:TimeoutMs", 1000); // Reduced to 1 second
+            _maxFailuresBeforeInactive = configuration.GetValue<int>("DevicePing:MaxFailuresBeforeInactive", 1); // Set to 1 for immediate change
 
-            _logger.LogInformation($"Device Ping Service configured with interval: {_pingInterval.TotalSeconds}s, " +
+            _logger.LogInformation($"Rapid Device Ping Service configured with interval: {_pingInterval.TotalSeconds}s, " +
                                   $"port: {_pingPort}, timeout: {_pingTimeout}ms, " +
-                                  $"max failures: {_maxFailuresBeforeInactive}");
+                                  $"max failures: {_maxFailuresBeforeInactive} (immediate status change)");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Device Ping Service is starting...");
+            _logger.LogInformation("Rapid Device Ping Service is starting...");
 
             try
             {
@@ -74,20 +75,30 @@ namespace DeviceDataCollector.Services
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                // Get all registered devices including their active status
-                var devices = await dbContext.Devices
-                    .Select(d => new { d.Id, d.SerialNumber, d.LastConnectionTime, d.IsActive })
-                    .ToListAsync(stoppingToken);
+                // Get all registered devices
+                var devices = await dbContext.Devices.ToListAsync(stoppingToken);
 
                 _logger.LogInformation($"Pinging {devices.Count} devices...");
 
                 foreach (var device in devices)
                 {
-                    // Skip very recent connections to avoid excessive pinging
+                    // Skip devices with very recent connections (they're definitely active)
+                    TimeSpan skipTimeThreshold = TimeSpan.FromSeconds(30); // Reduced to just 30 seconds
                     if (device.LastConnectionTime.HasValue &&
-                        DateTime.Now - device.LastConnectionTime.Value < TimeSpan.FromMinutes(5))
+                        DateTime.Now - device.LastConnectionTime.Value < skipTimeThreshold)
                     {
-                        _logger.LogDebug($"Skipping recent device: {device.SerialNumber}");
+                        _logger.LogDebug($"Skipping recent device: {device.SerialNumber} (connected {(DateTime.Now - device.LastConnectionTime.Value).TotalSeconds:F1} seconds ago)");
+
+                        // Make sure device is marked as active if it has a recent connection
+                        if (!device.IsActive)
+                        {
+                            device.IsActive = true;
+                            await dbContext.SaveChangesAsync();
+                            _logger.LogInformation($"Device {device.SerialNumber} marked as ACTIVE due to recent connection");
+                        }
+
+                        // Reset failure count for recently connected devices
+                        _deviceFailureCount[device.SerialNumber] = 0;
                         continue;
                     }
 
@@ -95,73 +106,44 @@ namespace DeviceDataCollector.Services
                     var latestIP = await GetDeviceIPAddressAsync(dbContext, device.SerialNumber, stoppingToken);
                     if (string.IsNullOrEmpty(latestIP))
                     {
-                        _logger.LogWarning($"No known IP address for device: {device.SerialNumber}");
+                        _logger.LogWarning($"No known IP address for device: {device.SerialNumber}, cannot ping");
+
+                        // If no known IP and device is active, mark as inactive immediately
+                        if (device.IsActive)
+                        {
+                            device.IsActive = false;
+                            await dbContext.SaveChangesAsync();
+                            _logger.LogWarning($"Device {device.SerialNumber} marked as INACTIVE (no known IP address)");
+                        }
                         continue;
                     }
 
-                    // Ping the device
+                    _logger.LogDebug($"Pinging device {device.SerialNumber} at {latestIP}:{_pingPort}...");
+
+                    // Ping the device with quick timeout
                     var isAlive = await PingDeviceAsync(latestIP, _pingPort, device.SerialNumber, stoppingToken);
 
-                    // Check if we need to update device status
-                    await UpdateDeviceStatusAsync(dbContext, device.SerialNumber, device.Id, device.IsActive, isAlive);
+                    // Update device status immediately
+                    if (isAlive && !device.IsActive)
+                    {
+                        device.IsActive = true;
+                        device.LastConnectionTime = DateTime.Now;
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogInformation($"🟢 Device {device.SerialNumber} marked as ACTIVE (ping successful)");
+                    }
+                    else if (!isAlive && device.IsActive)
+                    {
+                        device.IsActive = false;
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogWarning($"🔴 Device {device.SerialNumber} marked as INACTIVE (ping failed)");
+                    }
 
-                    _logger.LogInformation($"Device {device.SerialNumber} at {latestIP}:{_pingPort} is {(isAlive ? "responding" : "not responding")}");
+                    _logger.LogInformation($"Device {device.SerialNumber} at {latestIP}:{_pingPort} is {(isAlive ? "RESPONDING" : "NOT RESPONDING")}");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error while pinging devices");
-            }
-        }
-
-        private async Task UpdateDeviceStatusAsync(ApplicationDbContext dbContext, string serialNumber, int deviceId, bool currentStatus, bool isAlive)
-        {
-            try
-            {
-                // Initialize failure count for this device if it doesn't exist
-                if (!_deviceFailureCount.ContainsKey(serialNumber))
-                {
-                    _deviceFailureCount[serialNumber] = 0;
-                }
-
-                if (isAlive)
-                {
-                    // Device is responding - reset failure count
-                    _deviceFailureCount[serialNumber] = 0;
-
-                    // If device was inactive, mark it as active
-                    if (!currentStatus)
-                    {
-                        var device = await dbContext.Devices.FindAsync(deviceId);
-                        if (device != null)
-                        {
-                            device.IsActive = true;
-                            await dbContext.SaveChangesAsync();
-                            _logger.LogInformation($"Device {serialNumber} is now marked as ACTIVE");
-                        }
-                    }
-                }
-                else
-                {
-                    // Device is not responding - increment failure count
-                    _deviceFailureCount[serialNumber]++;
-
-                    // If we've reached max failures and device is active, mark it inactive
-                    if (_deviceFailureCount[serialNumber] >= _maxFailuresBeforeInactive && currentStatus)
-                    {
-                        var device = await dbContext.Devices.FindAsync(deviceId);
-                        if (device != null)
-                        {
-                            device.IsActive = false;
-                            await dbContext.SaveChangesAsync();
-                            _logger.LogWarning($"Device {serialNumber} is now marked as INACTIVE after {_deviceFailureCount[serialNumber]} consecutive failures");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error updating status for device {serialNumber}");
             }
         }
 
@@ -198,7 +180,7 @@ namespace DeviceDataCollector.Services
             {
                 using (var client = new TcpClient())
                 {
-                    // Set timeout for connection
+                    // Use quick timeout for immediate status detection
                     var connectTask = client.ConnectAsync(ipAddress, port);
                     var timeoutTask = Task.Delay(_pingTimeout, stoppingToken);
 
@@ -214,6 +196,7 @@ namespace DeviceDataCollector.Services
                     // Check if connection was successful
                     if (!client.Connected)
                     {
+                        _logger.LogDebug($"Failed to connect to {ipAddress}:{port}");
                         return false;
                     }
 
@@ -227,10 +210,10 @@ namespace DeviceDataCollector.Services
                         await stream.WriteAsync(data, 0, data.Length, stoppingToken);
                         _logger.LogDebug($"Sent ping message to {ipAddress}:{port}: {pingMessage}");
 
-                        // Set read timeout
+                        // Use quick timeout for response
                         client.ReceiveTimeout = _pingTimeout;
 
-                        // Try to read response
+                        // Try to read response with quick timeout
                         var buffer = new byte[1024];
                         var readTask = stream.ReadAsync(buffer, 0, buffer.Length, stoppingToken);
                         var readTimeoutTask = Task.Delay(_pingTimeout, stoppingToken);
@@ -238,8 +221,8 @@ namespace DeviceDataCollector.Services
                         var readCompletedTask = await Task.WhenAny(readTask, readTimeoutTask);
                         if (readCompletedTask == readTimeoutTask)
                         {
-                            _logger.LogDebug($"No response from {ipAddress}:{port}");
-                            return true; // Device is reachable even without response
+                            _logger.LogDebug($"No response from {ipAddress}:{port} after sending ping message");
+                            return false;
                         }
 
                         var bytesRead = await readTask;

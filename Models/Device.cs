@@ -8,7 +8,7 @@ namespace DeviceDataCollector.Models
         public int Id { get; set; }
 
         [Required]
-        public string SerialNumber { get; set; } // Serial Number (SN) of the device
+        public string? SerialNumber { get; set; } // Serial Number (SN) of the device
 
         public string? Name { get; set; } // Friendly name for the device
 

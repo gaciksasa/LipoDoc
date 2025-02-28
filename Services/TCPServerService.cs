@@ -166,8 +166,8 @@ namespace DeviceDataCollector.Services
                 {
                     SerialNumber = deviceId,
                     Name = $"Device {deviceId}",
-                    RegisteredDate = DateTime.Now, // Using local time instead of UTC
-                    LastConnectionTime = DateTime.Now, // Using local time instead of UTC
+                    RegisteredDate = DateTime.Now,
+                    LastConnectionTime = DateTime.Now,
                     IsActive = true
                 };
 
@@ -177,8 +177,9 @@ namespace DeviceDataCollector.Services
             }
             else
             {
-                // Update last connection time
-                existingDevice.LastConnectionTime = DateTime.Now; // Using local time instead of UTC
+                // Update last connection time AND set active status to true
+                existingDevice.LastConnectionTime = DateTime.Now;
+                existingDevice.IsActive = true; // Add this line to mark device as active when it connects
                 await dbContext.SaveChangesAsync();
             }
         }
