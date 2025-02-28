@@ -16,7 +16,7 @@ namespace DeviceDataCollector.Models
 
         public DateTime? LastConnectionTime { get; set; } // Last time the device connected
 
-        public DateTime RegisteredDate { get; set; } = DateTime.UtcNow;
+        public DateTime RegisteredDate { get; set; } = DateTime.Now; // Using local time instead of UTC
 
         public bool IsActive { get; set; } = true;
 

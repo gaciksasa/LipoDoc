@@ -1,6 +1,5 @@
 ﻿using DeviceDataCollector.Data;
 using DeviceDataCollector.Models;
-using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.EntityFrameworkCore;
 
 namespace DeviceDataCollector.Services
@@ -36,8 +35,8 @@ namespace DeviceDataCollector.Services
                     return null;
                 }
 
-                // Update last login time
-                user.LastLogin = DateTime.UtcNow;
+                // Update last login time with local time
+                user.LastLogin = DateTime.Now; // Using local time instead of UTC
                 await _context.SaveChangesAsync();
 
                 return user;

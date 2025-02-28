@@ -27,6 +27,13 @@ namespace DeviceDataCollector.Controllers
                 .OrderByDescending(d => d.LastConnectionTime)
                 .ToListAsync();
 
+            // Check if it's an AJAX request
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                // If it's an AJAX request, return partial view
+                return PartialView("_DeviceList", devices);
+            }
+
             return View(devices);
         }
 

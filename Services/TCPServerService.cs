@@ -166,8 +166,8 @@ namespace DeviceDataCollector.Services
                 {
                     SerialNumber = deviceId,
                     Name = $"Device {deviceId}",
-                    RegisteredDate = DateTime.UtcNow,
-                    LastConnectionTime = DateTime.UtcNow,
+                    RegisteredDate = DateTime.Now, // Using local time instead of UTC
+                    LastConnectionTime = DateTime.Now, // Using local time instead of UTC
                     IsActive = true
                 };
 
@@ -178,7 +178,7 @@ namespace DeviceDataCollector.Services
             else
             {
                 // Update last connection time
-                existingDevice.LastConnectionTime = DateTime.UtcNow;
+                existingDevice.LastConnectionTime = DateTime.Now; // Using local time instead of UTC
                 await dbContext.SaveChangesAsync();
             }
         }

@@ -46,7 +46,7 @@ namespace DeviceDataCollector.Data
                     Role = "Admin",
                     FullName = "Administrator",
                     Email = "admin@blooddonation.org",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now // Using local time instead of UTC
                 },
                 new User
                 {
@@ -57,7 +57,7 @@ namespace DeviceDataCollector.Data
                     Role = "User",
                     FullName = "Regular User",
                     Email = "user@blooddonation.org",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now // Using local time instead of UTC
                 }
             );
         }

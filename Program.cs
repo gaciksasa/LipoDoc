@@ -40,13 +40,14 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPSer
 builder.Services.AddScoped<DatabaseStatusService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeviceMessageParser>();
+builder.Services.AddHostedService<DevicePingService>();
 
 // Add BCrypt
 builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 
 var app = builder.Build();
 
-// Initialize database
+// Initialize database - improved to avoid recreating existing tables
 try
 {
     using (var scope = app.Services.CreateScope())
@@ -54,42 +55,41 @@ try
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        logger.LogInformation("Checking database existence and applying migrations if needed...");
+        logger.LogInformation("Checking database connection and schema...");
 
-        // Ensure database exists
-        dbContext.Database.EnsureCreated();
+        // Check if database exists and can connect
+        bool canConnect = await dbContext.Database.CanConnectAsync();
+        if (!canConnect)
+        {
+            logger.LogWarning("Database connection failed. Will attempt to create database.");
+            // This will create the database if it doesn't exist but won't recreate tables
+            await dbContext.Database.EnsureCreatedAsync();
+        }
+        else
+        {
+            // Check if any pending migrations need to be applied
+            if ((await dbContext.Database.GetPendingMigrationsAsync()).Any())
+            {
+                logger.LogInformation("Applying pending migrations...");
+                await dbContext.Database.MigrateAsync();
+                logger.LogInformation("Migrations applied successfully.");
+            }
+            else
+            {
+                logger.LogInformation("Database is up to date. No migrations needed.");
+            }
+        }
 
-        // Apply any pending migrations
-        dbContext.Database.Migrate();
-
-        // Verify that the Devices table exists
-        bool devicesTableExists = false;
+        // Verify table existence by performing a non-destructive query
         try
         {
-            // Try to access the Devices table to verify it exists
-            devicesTableExists = dbContext.Devices.Any();
-            logger.LogInformation("Devices table exists and is accessible");
+            // Just check if any users exist - won't cause schema changes
+            var userCount = await dbContext.Users.CountAsync();
+            logger.LogInformation($"Database contains {userCount} user records.");
         }
-        catch (Exception ex)
+        catch (Exception tableEx)
         {
-            logger.LogError(ex, "Error accessing Devices table. It may not exist.");
-        }
-
-        // If the table doesn't exist, try creating it manually
-        if (!devicesTableExists)
-        {
-            logger.LogWarning("Devices table not found. Attempting to create it...");
-            try
-            {
-                // Force the creation of all tables again
-                dbContext.Database.EnsureDeleted();
-                dbContext.Database.EnsureCreated();
-                logger.LogInformation("Database recreated with all tables");
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to recreate database");
-            }
+            logger.LogError(tableEx, "Error accessing database tables. Schema may be outdated or incomplete.");
         }
 
         logger.LogInformation("Database initialization completed");

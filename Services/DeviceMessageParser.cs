@@ -191,6 +191,9 @@ namespace DeviceDataCollector.Services
         {
             try
             {
+                if (string.IsNullOrEmpty(timestamp))
+                    return DateTime.Now; // Return local time instead of UTC
+
                 // Format: "HH:mm:ssdd:MM:yyyy" or similar
                 // Need to handle possible formats
 
@@ -209,6 +212,7 @@ namespace DeviceDataCollector.Services
                     int month = int.Parse(dateStr.Substring(2, 2));
                     int year = int.Parse(dateStr.Substring(4));
 
+                    // Return local DateTime instead of UTC
                     return new DateTime(year, month, day, hour, minute, second);
                 }
             }
@@ -217,7 +221,7 @@ namespace DeviceDataCollector.Services
                 _logger.LogError(ex, $"Error parsing timestamp: {timestamp}");
             }
 
-            return DateTime.Now; // Default to current time if parsing fails
+            return DateTime.Now; // Default to current local time if parsing fails
         }
     }
 }
