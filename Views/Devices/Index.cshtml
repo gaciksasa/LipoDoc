@@ -18,6 +18,12 @@
             <button id="manualRefresh" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-arrow-clockwise"></i> Refresh Now
             </button>
+            @if (User.IsInRole("Admin"))
+            {
+                <a asp-action="RetrieveAllData" class="btn btn-sm btn-success">
+                    <i class="bi bi-cloud-download"></i> Retrieve All Buffered Data
+                </a>
+            }
             <div class="form-check form-switch d-inline-block ms-2">
                 <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
                 <label class="form-check-label" for="autoRefreshToggle">Auto-refresh</label>

@@ -1,5 +1,7 @@
-﻿using DeviceDataCollector.Data;
+﻿// DeviceDataCollector/Controllers/DevicesController.cs
+using DeviceDataCollector.Data;
 using DeviceDataCollector.Models;
+using DeviceDataCollector.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,13 +13,16 @@ namespace DeviceDataCollector.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DevicesController> _logger;
+        private readonly DeviceDataRetrievalService _dataRetrievalService;
 
         public DevicesController(
             ApplicationDbContext context,
-            ILogger<DevicesController> logger)
+            ILogger<DevicesController> logger,
+            DeviceDataRetrievalService dataRetrievalService)
         {
             _context = context;
             _logger = logger;
+            _dataRetrievalService = dataRetrievalService;
         }
 
         // GET: Devices
@@ -287,6 +292,60 @@ namespace DeviceDataCollector.Controllers
             }
 
             return View(await PaginatedList<DonationsData>.CreateAsync(query, pageNumber ?? 1, pageSize));
+        }
+
+        // GET: Devices/RetrieveData/5
+        [Authorize]
+        public async Task<IActionResult> RetrieveData(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var device = await _context.Devices.FindAsync(id);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            // Check if device is active
+            if (!device.IsActive)
+            {
+                TempData["ErrorMessage"] = $"Cannot retrieve data from inactive device {device.SerialNumber}";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+
+            try
+            {
+                await _dataRetrievalService.RetrieveDeviceBufferedDataAsync(device);
+                TempData["SuccessMessage"] = $"Data retrieval request sent to {device.SerialNumber}. Check Donations page for new data.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error requesting data from device {device.SerialNumber}");
+                TempData["ErrorMessage"] = $"Error requesting data from device: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Details), new { id = id });
+        }
+
+        // GET: Devices/RetrieveAllData
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> RetrieveAllData()
+        {
+            try
+            {
+                await _dataRetrievalService.RetrieveAllDevicesBufferedDataAsync();
+                TempData["SuccessMessage"] = "Data retrieval requests sent to all active devices. Check Donations page for new data.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error requesting data from all devices");
+                TempData["ErrorMessage"] = $"Error requesting data from devices: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Index));
         }
 
         private bool DeviceExists(int id)

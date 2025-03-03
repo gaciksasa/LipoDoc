@@ -40,6 +40,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPSer
 builder.Services.AddScoped<DatabaseStatusService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeviceMessageParser>();
+builder.Services.AddScoped<DeviceDataRetrievalService>();
 builder.Services.AddHostedService<DevicePingService>();
 
 // Add BCrypt
