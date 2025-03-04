@@ -39,6 +39,20 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="encoding" class="form-label">Message Encoding</label>
+                            <select class="form-select" id="encoding" name="encoding">
+                                <option value="ASCII" selected>ASCII</option>
+                                <option value="UTF8">UTF-8</option>
+                                <option value="Base64">Base64</option>
+                                <option value="Hex">Hexadecimal</option>
+                                <option value="Binary">Binary</option>
+                            </select>
+                            <div class="form-text">
+                                Select the encoding method for sending the message
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="message" class="form-label">Message</label>
                             <textarea class="form-control" id="message" name="message" rows="4" placeholder="Enter your message here" required></textarea>
                         </div>
@@ -78,6 +92,31 @@
 @section Scripts {
     <script>
         $(document).ready(function() {
+            // Encode message based on selected encoding
+            function encodeMessage(message, encoding) {
+                switch(encoding) {
+                    case 'ASCII':
+                        return new TextEncoder().encode(message);
+                    case 'UTF8':
+                        return new TextEncoder('utf-8').encode(message);
+                    case 'Base64':
+                        return Uint8Array.from(atob(message), c => c.charCodeAt(0));
+                    case 'Hex':
+                        // Remove spaces and non-hex characters
+                        const hexClean = message.replace(/[^0-9A-Fa-f]/g, '');
+                        return new Uint8Array(hexClean.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                    case 'Binary':
+                        // Remove spaces and validate binary
+                        const binaryClean = message.replace(/\s/g, '');
+                        if (!/^[01]+$/.test(binaryClean)) {
+                            throw new Error('Invalid binary string');
+                        }
+                        return new Uint8Array(binaryClean.match(/.{8}/g).map(byte => parseInt(byte, 2)));
+                    default:
+                        return new TextEncoder().encode(message);
+                }
+            }
+
             // Initialize form submission
             $('#deviceMessageForm').on('submit', function(e) {
                 e.preventDefault();
@@ -90,42 +129,58 @@
                 const ipAddress = $('#ipAddress').val();
                 const port = $('#port').val();
                 const message = $('#message').val();
+                const encoding = $('#encoding').val();
 
-                // Log the attempt
-                logMessage('Sending', `Attempting to send message to ${ipAddress}:${port}`);
-                logMessage('Message', message);
+                try {
+                    // Encode the message
+                    const encodedMessage = encodeMessage(message, encoding);
 
-                // Send request
-                $.ajax({
-                    url: '@Url.Action("SendMessageToDevice", "Device")',
-                    type: 'POST',
-                    data: {
-                        ipAddress: ipAddress,
-                        port: port,
-                        message: message
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            logMessage('Success', `Message sent successfully to ${ipAddress}:${port}`, 'success');
+                    // Log the attempt
+                    logMessage('Sending', `Attempting to send ${encoding} encoded message to ${ipAddress}:${port}`);
+                    logMessage('Message', `Raw message: ${message}`);
+                    logMessage('Encoded', `Bytes: ${Array.from(encodedMessage).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
 
-                            if (response.response) {
-                                logMessage('Response', response.response, 'info');
+                    // Send request
+                    $.ajax({
+                        url: '@Url.Action("SendMessageToDevice", "Device")',
+                        type: 'POST',
+                        contentType: 'application/octet-stream',
+                        data: JSON.stringify({
+                            ipAddress: ipAddress,
+                            port: port,
+                            message: Array.from(encodedMessage),
+                            encoding: encoding
+                        }),
+                        processData: false,
+                        success: function(response) {
+                            if (response.success) {
+                                logMessage('Success', `Message sent successfully to ${ipAddress}:${port}`, 'success');
+
+                                if (response.response) {
+                                    logMessage('Response', response.response, 'info');
+                                } else {
+                                    logMessage('Info', 'No response received from device', 'info');
+                                }
                             } else {
-                                logMessage('Info', 'No response received from device', 'info');
+                                logMessage('Error', `Failed to send message to ${ipAddress}:${port}: ${response.response || 'Unknown error'}`, 'danger');
                             }
-                        } else {
-                            logMessage('Error', `Failed to send message to ${ipAddress}:${port}: ${response.response || 'Unknown error'}`, 'danger');
+                        },
+                        error: function(xhr, status, error) {
+                            logMessage('Error', `Network Error: ${error}`, 'danger');
+                            logMessage('Details', `Status: ${xhr.status}, Response: ${xhr.responseText}`, 'danger');
+                        },
+                        complete: function() {
+                            // Hide spinner
+                            $('#sendButton').attr('disabled', false);
+                            $('#sendSpinner').addClass('d-none');
                         }
-                    },
-                    error: function(xhr, status, error) {
-                        logMessage('Error', `Error: ${error}`, 'danger');
-                    },
-                    complete: function() {
-                        // Hide spinner
-                        $('#sendButton').attr('disabled', false);
-                        $('#sendSpinner').addClass('d-none');
-                    }
-                });
+                    });
+                } catch (encodeError) {
+                    // Handle encoding errors
+                    logMessage('Encoding Error', encodeError.message, 'danger');
+                    $('#sendButton').attr('disabled', false);
+                    $('#sendSpinner').addClass('d-none');
+                }
             });
 
             // Clear log button

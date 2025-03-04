@@ -1,5 +1,4 @@
-﻿// DeviceDataCollector/Controllers/DevicesController.cs
-using DeviceDataCollector.Data;
+﻿using DeviceDataCollector.Data;
 using DeviceDataCollector.Models;
 using DeviceDataCollector.Services;
 using Microsoft.AspNetCore.Authorization;

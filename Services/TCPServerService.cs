@@ -11,9 +11,9 @@ namespace DeviceDataCollector.Services
     {
         private readonly ILogger<TCPServerService> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
-        private TcpListener _server;
+        private TcpListener? _server;
         private readonly int _port;
-        private readonly string _ipAddress;
+        private readonly string _ipAddress = string.Empty;
         private readonly HashSet<string> _appIpAddresses;
 
         public TCPServerService(
@@ -25,12 +25,13 @@ namespace DeviceDataCollector.Services
             _scopeFactory = scopeFactory;
 
             _port = configuration.GetValue<int>("TCPServer:Port", 5000);
-            _ipAddress = configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2");
+            _ipAddress = configuration.GetValue<string>("TCPServer:IPAddress", "192.168.1.124") ?? string.Empty;
 
             // List of IP addresses that are part of our application and shouldn't store data
             _appIpAddresses = new HashSet<string> {
                 "127.0.0.1",
-                "127.0.0.2", // Our app's primary loopback
+                // "127.0.0.2",
+                "192.168.1.124",
                 "::1",
                 "localhost"
             };
@@ -72,8 +73,8 @@ namespace DeviceDataCollector.Services
 
         private async Task HandleClientAsync(TcpClient client, CancellationToken stoppingToken)
         {
-            string clientIP = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
-            int clientPort = ((IPEndPoint)client.Client.RemoteEndPoint).Port;
+            string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString(); 
+            int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port; 
 
             // Log all connections for debugging
             _logger.LogInformation($"Client connected: {clientIP}:{clientPort}");

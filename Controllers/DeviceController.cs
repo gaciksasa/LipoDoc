@@ -22,26 +22,49 @@ namespace DeviceDataCollector.Controllers
         public IActionResult SendMessage()
         {
             // Get the default IP from config for the view
-            ViewBag.DefaultTargetIP = "127.0.0.3"; // Default to Hercules address
+            ViewBag.DefaultTargetIP = "192.168.1.101"; // Default
             ViewBag.DefaultPort = 5000;
-            ViewBag.AppIP = _configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2");
-            ViewBag.HerculesIP = "127.0.0.3";
+            ViewBag.AppIP = _configuration.GetValue<string>("TCPServer:IPAddress", "192.168.1.124");
+            // ViewBag.HerculesIP = "127.0.0.3";
 
             return View();
         }
 
-        [HttpPost]
-        public async Task<IActionResult> SendMessageToDevice(string ipAddress, int port, string message)
+        public enum MessageEncoding
         {
-            _logger.LogInformation($"Attempting to send message to {ipAddress}:{port}: {message}");
+            ASCII,       // Standard ASCII encoding
+            UTF8,        // UTF-8 encoding
+            Base64,      // Base64 encoded message
+            Hex,         // Hexadecimal representation
+            Binary       // Raw binary conversion
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SendMessageToDevice(
+            string ipAddress,
+            int port,
+            string message,
+            MessageEncoding encoding = MessageEncoding.ASCII)
+        {
+            _logger.LogInformation($"Attempting to send message to {ipAddress}:{port} with {encoding} encoding");
 
             try
             {
-                // Direct TCP client implementation
+                // Prepare the message based on encoding
+                byte[] messageBytes = encoding switch
+                {
+                    MessageEncoding.ASCII => Encoding.ASCII.GetBytes(message + "\r\n"),
+                    MessageEncoding.UTF8 => Encoding.UTF8.GetBytes(message + "\r\n"),
+                    MessageEncoding.Base64 => Convert.FromBase64String(message),
+                    MessageEncoding.Hex => ConvertHexStringToBytes(message),
+                    MessageEncoding.Binary => ConvertBinaryStringToBytes(message),
+                    _ => Encoding.ASCII.GetBytes(message + "\r\n")
+                };
+
                 using (TcpClient client = new TcpClient())
                 {
                     // Set a local endpoint specific to our app
-                    string serverIP = _configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2");
+                    string serverIP = _configuration.GetValue<string>("TCPServer:IPAddress", "192.168.1.124") ?? string.Empty;
                     client.Client.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(serverIP), 0));
 
                     // Set timeout for connection
@@ -61,23 +84,17 @@ namespace DeviceDataCollector.Controllers
                         });
                     }
 
-                    _logger.LogInformation($"Connected to device at {ipAddress}:{port} from {serverIP}");
-
                     using (NetworkStream stream = client.GetStream())
                     {
                         client.ReceiveTimeout = 5000;
                         client.SendTimeout = 5000;
 
-                        // Add newline to message if not present
-                        string messageToSend = message.EndsWith("\r\n") ? message : message + "\r\n";
-                        byte[] data = Encoding.ASCII.GetBytes(messageToSend);
-
                         // Send the message
-                        await stream.WriteAsync(data, 0, data.Length);
-                        _logger.LogInformation($"Sent message to device: {message}");
+                        await stream.WriteAsync(messageBytes, 0, messageBytes.Length);
+                        _logger.LogInformation($"Sent {encoding} encoded message to device: {BitConverter.ToString(messageBytes)}");
 
                         // Wait for response
-                        string response = null;
+                        string? response = null;
                         try
                         {
                             byte[] responseBuffer = new byte[1024];
@@ -126,6 +143,46 @@ namespace DeviceDataCollector.Controllers
                     timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                 });
             }
+        }
+
+        // Helper method to convert hex string to bytes
+        private byte[] ConvertHexStringToBytes(string hexString)
+        {
+            // Remove any spaces or non-hex characters
+            hexString = new string(hexString.Where(c => "0123456789ABCDEFabcdef".Contains(c)).ToArray());
+
+            // Ensure even length
+            if (hexString.Length % 2 != 0)
+                throw new ArgumentException("Hex string must have an even number of characters");
+
+            byte[] bytes = new byte[hexString.Length / 2];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = Convert.ToByte(hexString.Substring(i * 2, 2), 16);
+            }
+            return bytes;
+        }
+
+        // Helper method to convert binary string to bytes
+        private byte[] ConvertBinaryStringToBytes(string binaryString)
+        {
+            // Remove any spaces
+            binaryString = binaryString.Replace(" ", "");
+
+            // Validate binary string
+            if (!binaryString.All(c => c == '0' || c == '1'))
+                throw new ArgumentException("Input must be a valid binary string");
+
+            // Pad to ensure full bytes
+            if (binaryString.Length % 8 != 0)
+                throw new ArgumentException("Binary string length must be a multiple of 8");
+
+            byte[] bytes = new byte[binaryString.Length / 8];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = Convert.ToByte(binaryString.Substring(i * 8, 8), 2);
+            }
+            return bytes;
         }
     }
 }
