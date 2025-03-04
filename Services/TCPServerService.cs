@@ -16,6 +16,11 @@ namespace DeviceDataCollector.Services
         private readonly string _ipAddress = string.Empty;
         private readonly HashSet<string> _appIpAddresses;
 
+        // Define the separator characters consistently across the service
+        private const char SEPARATOR = '\u00AA'; // Unicode 170 - this is the special separator character
+        private const char QUESTION_SEPARATOR = '\u003F'; // Unicode 63 - Question mark separator
+        private const char LINE_FEED = '\u000A'; // Unicode 10 - Line Feed character
+
         public TCPServerService(
             ILogger<TCPServerService> logger,
             IServiceScopeFactory scopeFactory,
@@ -73,8 +78,8 @@ namespace DeviceDataCollector.Services
 
         private async Task HandleClientAsync(TcpClient client, CancellationToken stoppingToken)
         {
-            string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString(); 
-            int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port; 
+            string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString();
+            int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port;
 
             // Log all connections for debugging
             _logger.LogInformation($"Client connected: {clientIP}:{clientPort}");
@@ -185,36 +190,184 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        private async Task SendResponseAsync(TcpClient client, string receivedMessage, string deviceId, CancellationToken stoppingToken)
+        private async Task SendResponseAsync(TcpClient client, string receivedMessage, string clientIP, CancellationToken stoppingToken)
         {
             try
             {
-                string response = "";
+                string response = string.Empty;
+                string deviceId = string.Empty;
 
-                // Check message type to determine appropriate response
-                if (receivedMessage.StartsWith("#S") || receivedMessage.StartsWith("#D"))
+                // Handle status messages
+                if (receivedMessage.StartsWith("#S"))
                 {
-                    // Acknowledge status or data messages
-                    response = $"#Aª{deviceId}ª\n";
+                    // Parse the status message to check for available data and get device ID
+                    var (availableData, extractedDeviceId) = ParseStatusMessage(receivedMessage);
+                    deviceId = extractedDeviceId; // Use the extracted device ID
+
+                    if (!string.IsNullOrEmpty(deviceId) && availableData > 0)
+                    {
+                        // Request data from device if there's available data
+                        // Format: #u\u00AASN\u00AA\u000A (where \u000A is a line feed)
+                        response = $"#u{SEPARATOR}{deviceId}{SEPARATOR}{LINE_FEED}";
+                        _logger.LogInformation($"Device has {availableData} records available, requesting data");
+                    }
+                    else if (!string.IsNullOrEmpty(deviceId))
+                    {
+                        // Simply acknowledge the status message if no data available
+                        // Format: #A\u00AASN\u00AA\u000A
+                        char separator = receivedMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
+                        response = $"#A{separator}{deviceId}{separator}{LINE_FEED}";
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not extract device ID from status message, no response sent");
+                    }
                 }
+                // Handle data messages
+                else if (receivedMessage.StartsWith("#D"))
+                {
+                    // Extract device ID from data message
+                    var parts = receivedMessage.Contains(SEPARATOR)
+                        ? receivedMessage.Split(SEPARATOR)
+                        : receivedMessage.Split(QUESTION_SEPARATOR);
+
+                    if (parts.Length > 1)
+                    {
+                        deviceId = parts[1];
+                    }
+
+                    // Store the data message in the database
+                    await StoreDeviceDataAsync(receivedMessage, client);
+
+                    // Send acknowledgment for data messages if we have a device ID
+                    if (!string.IsNullOrEmpty(deviceId))
+                    {
+                        // Format: #A\u00AASN\u00AA\u000A
+                        char separator = receivedMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
+                        response = $"#A{separator}{deviceId}{separator}{LINE_FEED}";
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not extract device ID from data message, no response sent");
+                    }
+                }
+                // Handle "no more data" messages from device
+                else if (receivedMessage.StartsWith("#U"))
+                {
+                    // Extract device ID from no more data message
+                    var parts = receivedMessage.Contains(SEPARATOR)
+                        ? receivedMessage.Split(SEPARATOR)
+                        : receivedMessage.Split(QUESTION_SEPARATOR);
+
+                    if (parts.Length > 1)
+                    {
+                        deviceId = parts[1];
+                        _logger.LogInformation($"Device {deviceId} has no more data to send");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not extract device ID from no more data message");
+                    }
+
+                    // No response needed for "no more data" message
+                }
+                // Handle data request
                 else if (receivedMessage.StartsWith("#u"))
                 {
-                    // Request for data - this would normally be followed by sending cached data
-                    // For now, just respond with "no more data" message
-                    response = $"#Uª{deviceId}ªB5ý\n";
+                    // Extract device ID from request message
+                    var parts = receivedMessage.Contains(SEPARATOR)
+                        ? receivedMessage.Split(SEPARATOR)
+                        : receivedMessage.Split(QUESTION_SEPARATOR);
+
+                    if (parts.Length > 1)
+                    {
+                        deviceId = parts[1];
+                    }
+
+                    // This is a request from us to the device, no direct response needed
+                    // The device should respond with data or "no more data" message
                 }
 
+                // Send the response if it's not empty
                 if (!string.IsNullOrEmpty(response))
                 {
+                    // Explicitly encode using ASCII
                     byte[] responseData = Encoding.ASCII.GetBytes(response);
+
+                    // Log the actual bytes being sent for debugging
+                    _logger.LogDebug($"Sending bytes: {BitConverter.ToString(responseData)}");
+
                     await client.GetStream().WriteAsync(responseData, 0, responseData.Length, stoppingToken);
-                    _logger.LogInformation($"Sent response to {deviceId}: {response}");
+
+                    // Log with appropriate identifier
+                    if (!string.IsNullOrEmpty(deviceId))
+                    {
+                        _logger.LogInformation($"Sent response to {deviceId}: {response.Replace(LINE_FEED, '\u2193')}"); // Replace LF with ↓ (Unicode U+2193) for readable logging
+                    }
+                    else
+                    {
+                        _logger.LogInformation($"Sent response to client {clientIP}: {response.Replace(LINE_FEED, '\u2193')}");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error sending response to {deviceId}");
+                _logger.LogError(ex, $"Error sending response to client {clientIP}");
             }
+        }
+
+        // Helper method to parse the number of available data records from a status message
+        // and also return the device ID
+        private (int availableData, string deviceId) ParseStatusMessage(string statusMessage)
+        {
+            try
+            {
+                // Expected formats: 
+                // #S\u00AALD0000000\u00AA0\u00AA14:18:2826:02:2025\u00AA1\u00AAD7ý
+                // #S\u003FLD0000000\u003F0\u003F02:05:5901:01:2020\u003F1\u003FC7\u003F
+
+                // Determine which separator is being used
+                char separator = statusMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
+                var parts = statusMessage.Split(separator);
+
+                // Log the parsing for debugging
+                _logger.LogDebug($"Parsing status message with separator '{separator}', found {parts.Length} parts");
+
+                string deviceId = string.Empty;
+                int availableData = 0;
+
+                // Device ID should be at index 1
+                if (parts.Length > 1)
+                {
+                    deviceId = parts[1];
+                    _logger.LogDebug($"Extracted device ID: {deviceId}");
+                }
+
+                // AvailableData should be at index 4
+                if (parts.Length > 4 && int.TryParse(parts[4], out int parsedData))
+                {
+                    availableData = parsedData;
+                    _logger.LogDebug($"Extracted available data count: {availableData}");
+                }
+
+                return (availableData, deviceId);
+            }
+            catch (Exception ex)
+            {
+                // Log parsing error but don't crash
+                _logger.LogError(ex, "Error parsing status message");
+                return (0, string.Empty); // Return empty values as fallback
+            }
+        }
+
+        // Helper method to store device data in the database
+        private async Task StoreDeviceDataAsync(string dataMessage, TcpClient client)
+        {
+            string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString();
+            int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port;
+
+            // Use existing ProcessDeviceMessageAsync to handle storing the data
+            await ProcessDeviceMessageAsync(dataMessage, clientIP, clientPort);
         }
     }
 }
