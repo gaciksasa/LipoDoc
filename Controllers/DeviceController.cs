@@ -22,9 +22,9 @@ namespace DeviceDataCollector.Controllers
         public IActionResult SendMessage()
         {
             // Get the default IP from config for the view
-            ViewBag.DefaultTargetIP = "192.168.1.101"; // Default
+            ViewBag.DefaultTargetIP = "127.0.0.3";
             ViewBag.DefaultPort = 5000;
-            ViewBag.AppIP = _configuration.GetValue<string>("TCPServer:IPAddress", "192.168.1.124");
+            ViewBag.AppIP = _configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2");
             // ViewBag.HerculesIP = "127.0.0.3";
 
             return View();
@@ -64,7 +64,7 @@ namespace DeviceDataCollector.Controllers
                 using (TcpClient client = new TcpClient())
                 {
                     // Set a local endpoint specific to our app
-                    string serverIP = _configuration.GetValue<string>("TCPServer:IPAddress", "192.168.1.124") ?? string.Empty;
+                    string serverIP = _configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2") ?? string.Empty;
                     client.Client.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(serverIP), 0));
 
                     // Set timeout for connection

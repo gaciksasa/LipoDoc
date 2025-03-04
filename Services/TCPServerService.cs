@@ -30,13 +30,13 @@ namespace DeviceDataCollector.Services
             _scopeFactory = scopeFactory;
 
             _port = configuration.GetValue<int>("TCPServer:Port", 5000);
-            _ipAddress = configuration.GetValue<string>("TCPServer:IPAddress", "192.168.1.124") ?? string.Empty;
+            _ipAddress = configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2") ?? string.Empty;
 
             // List of IP addresses that are part of our application and shouldn't store data
             _appIpAddresses = new HashSet<string> {
                 "127.0.0.1",
-                // "127.0.0.2",
-                "192.168.1.124",
+                "127.0.0.2",
+                // "192.168.1.124",
                 "::1",
                 "localhost"
             };
