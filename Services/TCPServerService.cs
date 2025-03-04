@@ -162,31 +162,70 @@ namespace DeviceDataCollector.Services
 
         private async Task EnsureDeviceRegisteredAsync(ApplicationDbContext dbContext, string deviceId)
         {
-            // Check if the device is already registered
-            var existingDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == deviceId);
+            // Add detailed logging at the beginning of the method
+            _logger.LogInformation($"Attempting to register device with ID: {deviceId}");
 
-            if (existingDevice == null)
+            if (string.IsNullOrWhiteSpace(deviceId))
             {
-                // Register the device with default values
-                var device = new Device
-                {
-                    SerialNumber = deviceId,
-                    Name = $"Device {deviceId}",
-                    RegisteredDate = DateTime.Now,
-                    LastConnectionTime = DateTime.Now,
-                    IsActive = true
-                };
-
-                dbContext.Devices.Add(device);
-                await dbContext.SaveChangesAsync();
-                _logger.LogInformation($"New device registered: {deviceId}");
+                _logger.LogWarning("Cannot register device: Empty or null device ID received");
+                return;
             }
-            else
+
+            try
             {
-                // Update last connection time AND set active status to true
-                existingDevice.LastConnectionTime = DateTime.Now;
-                existingDevice.IsActive = true; // Add this line to mark device as active when it connects
-                await dbContext.SaveChangesAsync();
+                // Check if the device is already registered
+                var existingDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == deviceId);
+
+                if (existingDevice == null)
+                {
+                    // Register the device with default values
+                    var device = new Device
+                    {
+                        SerialNumber = deviceId,
+                        Name = $"Device {deviceId}",
+                        RegisteredDate = DateTime.Now,
+                        LastConnectionTime = DateTime.Now,
+                        IsActive = true
+                    };
+
+                    _logger.LogInformation($"Registering new device: {deviceId}");
+                    dbContext.Devices.Add(device);
+
+                    try
+                    {
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogInformation($"✅ SUCCESS: New device registered: {deviceId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"❌ ERROR: Failed to save new device {deviceId} to database: {ex.Message}");
+                        throw; // Re-throw so the calling method knows there was an error
+                    }
+                }
+                else
+                {
+                    // Update last connection time AND set active status to true
+                    _logger.LogInformation($"Updating existing device: {deviceId}, Previous connection: {existingDevice.LastConnectionTime}, Active status: {existingDevice.IsActive}");
+
+                    existingDevice.LastConnectionTime = DateTime.Now;
+                    existingDevice.IsActive = true; // Mark device as active when it connects
+
+                    try
+                    {
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogInformation($"✅ SUCCESS: Updated device {deviceId}, new connection time: {existingDevice.LastConnectionTime}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"❌ ERROR: Failed to update existing device {deviceId}: {ex.Message}");
+                        throw; // Re-throw so the calling method knows there was an error
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"❌ ERROR: Unexpected error registering/updating device {deviceId}: {ex.Message}");
+                throw; // Re-throw so the calling method knows there was an error
             }
         }
 
