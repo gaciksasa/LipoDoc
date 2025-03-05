@@ -232,8 +232,7 @@ namespace DeviceDataCollector.Services
 
         private async Task EnsureDeviceRegisteredAsync(ApplicationDbContext dbContext, string deviceId)
         {
-            // Add detailed logging at the beginning of the method
-            _logger.LogInformation($"Attempting to register device with ID: {deviceId}");
+            _logger.LogInformation($"Ensuring device registration for ID: {deviceId}");
 
             if (string.IsNullOrWhiteSpace(deviceId))
             {
@@ -243,19 +242,56 @@ namespace DeviceDataCollector.Services
 
             try
             {
-                // Check if the device is already registered
+                // Check if the device is already registered by its device ID
                 var existingDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == deviceId);
 
                 if (existingDevice == null)
                 {
-                    // Register the device with default values
+                    // Look for temporary device registrations that might be this device
+                    // (devices registered by IP that should be updated with the real ID)
+                    if (!deviceId.StartsWith("Device_"))
+                    {
+                        var tempDevices = await dbContext.Devices
+                            .Where(d => d.SerialNumber.StartsWith("Device_") &&
+                                   d.Notes != null && d.Notes.Contains("Last IP:"))
+                            .ToListAsync();
+
+                        // Check each temp device to see if it might be this one
+                        foreach (var tempDevice in tempDevices)
+                        {
+                            // Extract IP from notes
+                            if (tempDevice.Notes.Contains("Last IP:"))
+                            {
+                                // If this is likely the same device, update it rather than creating a new record
+                                _logger.LogInformation($"Updating temporary device {tempDevice.SerialNumber} to real ID {deviceId}");
+
+                                // Store old ID for logging
+                                string oldId = tempDevice.SerialNumber;
+
+                                // Update the device with real ID and keep other info
+                                tempDevice.SerialNumber = deviceId;
+                                tempDevice.Name = $"Device {deviceId}";
+                                tempDevice.LastConnectionTime = DateTime.Now;
+                                tempDevice.Notes = $"{tempDevice.Notes}\nUpdated from temporary ID {oldId} to {deviceId} on {DateTime.Now}";
+
+                                await dbContext.SaveChangesAsync();
+                                _logger.LogInformation($"✅ SUCCESS: Temporary device updated to real ID: {deviceId}");
+
+                                // Exit early since we've updated an existing device
+                                return;
+                            }
+                        }
+                    }
+
+                    // If no temporary device found, register a new device
                     var device = new Device
                     {
                         SerialNumber = deviceId,
                         Name = $"Device {deviceId}",
                         RegisteredDate = DateTime.Now,
                         LastConnectionTime = DateTime.Now,
-                        IsActive = true
+                        IsActive = true,
+                        Notes = $"Registered on: {DateTime.Now}"
                     };
 
                     _logger.LogInformation($"Registering new device: {deviceId}");
@@ -269,33 +305,24 @@ namespace DeviceDataCollector.Services
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"❌ ERROR: Failed to save new device {deviceId} to database: {ex.Message}");
-                        throw; // Re-throw so the calling method knows there was an error
+                        throw;
                     }
                 }
                 else
                 {
-                    // Update last connection time AND set active status to true
-                    _logger.LogInformation($"Updating existing device: {deviceId}, Previous connection: {existingDevice.LastConnectionTime}, Active status: {existingDevice.IsActive}");
-
+                    // Update the existing device
+                    _logger.LogInformation($"Updating existing device: {deviceId}");
                     existingDevice.LastConnectionTime = DateTime.Now;
-                    existingDevice.IsActive = true; // Mark device as active when it connects
+                    existingDevice.IsActive = true;
 
-                    try
-                    {
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"✅ SUCCESS: Updated device {deviceId}, new connection time: {existingDevice.LastConnectionTime}");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"❌ ERROR: Failed to update existing device {deviceId}: {ex.Message}");
-                        throw; // Re-throw so the calling method knows there was an error
-                    }
+                    await dbContext.SaveChangesAsync();
+                    _logger.LogInformation($"✅ SUCCESS: Updated device {deviceId}");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"❌ ERROR: Unexpected error registering/updating device {deviceId}: {ex.Message}");
-                throw; // Re-throw so the calling method knows there was an error
+                _logger.LogError(ex, $"❌ ERROR: Unexpected error managing device {deviceId}: {ex.Message}");
+                throw;
             }
         }
 
