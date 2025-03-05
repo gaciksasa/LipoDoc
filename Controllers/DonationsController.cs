@@ -40,26 +40,6 @@ namespace DeviceDataCollector.Controllers
             return View(donationData);
         }
 
-        // GET: Donations/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
-
-        // POST: Donations/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DonationsData donationData)
-        {
-            if (ModelState.IsValid)
-            {
-                _context.Add(donationData);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(donationData);
-        }
-
         // GET: Donations/Edit/5
         [Authorize(Policy = "RequireAdminRole")] // Only admins can edit
         public async Task<IActionResult> Edit(int? id)
