@@ -113,12 +113,6 @@
                             <a asp-action="Donations" asp-route-id="@Model.Id" class="btn btn-primary">
                                 <i class="bi bi-droplet"></i> View Donations
                             </a>
-                            @if (Model.IsActive)
-                            {
-                                <a asp-action="RetrieveData" asp-route-id="@Model.Id" class="btn btn-success">
-                                    <i class="bi bi-cloud-download"></i> Retrieve Buffered Data
-                                </a>
-                            }
                             @if (User.IsInRole("Admin"))
                             {
                                 <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">

@@ -44,7 +44,6 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Device
 builder.Services.AddScoped<DatabaseStatusService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeviceMessageParser>();
-builder.Services.AddScoped<DeviceDataRetrievalService>();
 builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 
 var app = builder.Build();

@@ -148,15 +148,15 @@ namespace DeviceDataCollector.Services
                         // Process and store the data
                         await ProcessDeviceMessageAsync(data, clientIP, clientPort);
 
-                        // Send acknowledgment based on message type
-                        await SendResponseAsync(client, data, clientIP, stoppingToken);
+                        // Send simple acknowledgment
+                        await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
                     }
                     else
                     {
                         _logger.LogWarning($"Skipping duplicate message from {clientIP}:{clientPort}: {messageHash}");
 
                         // Still send acknowledgment so device doesn't retry
-                        await SendResponseAsync(client, data, clientIP, stoppingToken);
+                        await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
                     }
                 }
             }
@@ -325,58 +325,6 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        // Optional: Method to selectively record status history
-        private async Task MaybeRecordStatusHistoryAsync(ApplicationDbContext dbContext, DeviceStatus status)
-        {
-            try
-            {
-                // Get the most recent status for this device from history
-                var lastStatus = await dbContext.DeviceStatuses
-                    .Where(s => s.DeviceId == status.DeviceId)
-                    .OrderByDescending(s => s.Timestamp)
-                    .FirstOrDefaultAsync();
-
-                bool shouldRecordHistory = false;
-
-                // Record history if:
-                // 1. First status for this device
-                if (lastStatus == null)
-                {
-                    shouldRecordHistory = true;
-                    _logger.LogInformation($"Recording first history entry for device {status.DeviceId}");
-                }
-                // 2. Status value changed
-                else if (lastStatus.Status != status.Status)
-                {
-                    shouldRecordHistory = true;
-                    _logger.LogInformation($"Recording history due to status change: {lastStatus.Status} -> {status.Status}");
-                }
-                // 3. Available data count changed significantly
-                else if (Math.Abs(lastStatus.AvailableData - status.AvailableData) > 5)
-                {
-                    shouldRecordHistory = true;
-                    _logger.LogInformation($"Recording history due to available data change: {lastStatus.AvailableData} -> {status.AvailableData}");
-                }
-                // 4. It's been at least 1 hour since the last status record
-                else if ((status.Timestamp - lastStatus.Timestamp).TotalHours >= 1)
-                {
-                    shouldRecordHistory = true;
-                    _logger.LogInformation($"Recording periodic history entry (hourly) for device {status.DeviceId}");
-                }
-
-                if (shouldRecordHistory)
-                {
-                    // Add to history
-                    dbContext.DeviceStatuses.Add(status);
-                    await dbContext.SaveChangesAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error in status history decision for device {status.DeviceId}");
-            }
-        }
-
         private async Task RegisterOrUpdateDeviceFromStatusAsync(ApplicationDbContext dbContext, DeviceStatus status, string currentIpAddress)
         {
             string deviceId = status.DeviceId;
@@ -435,225 +383,60 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        private async Task SendResponseAsync(TcpClient client, string receivedMessage, string clientIP, CancellationToken stoppingToken)
+        private async Task SendSimpleAcknowledgmentAsync(TcpClient client, string receivedMessage, string clientIP, CancellationToken stoppingToken)
         {
             try
             {
                 byte[] responseData = null;
                 string deviceId = string.Empty;
 
-                // Handle status messages
-                if (receivedMessage.StartsWith("#S"))
+                // Extract device ID from the message
+                if (receivedMessage.Contains(SEPARATOR) || receivedMessage.Contains(QUESTION_SEPARATOR))
                 {
-                    // Parse the status message to check for available data and get device ID
-                    var (availableData, extractedDeviceId) = ParseStatusMessage(receivedMessage);
-                    deviceId = extractedDeviceId; // Use the extracted device ID
-
-                    if (!string.IsNullOrEmpty(deviceId) && availableData > 0)
-                    {
-                        // Request data from device if there's available data using hex format:
-                        // #u (0x23 0x75) + separator (0xAA) + deviceId bytes + separator (0xAA) + LF (0x0A)
-                        using (var ms = new MemoryStream())
-                        {
-                            // #u prefix (0x23 0x75)
-                            ms.WriteByte(0x23); // #
-                            ms.WriteByte(0x75); // u
-
-                            // Separator (0xAA)
-                            ms.WriteByte(0xAA);
-
-                            // Device ID bytes
-                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
-                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
-
-                            // Second separator (0xAA)
-                            ms.WriteByte(0xAA);
-
-                            // Line feed (0x0A)
-                            ms.WriteByte(0x0A);
-
-                            responseData = ms.ToArray();
-                        }
-
-                        _logger.LogInformation($"Device has {availableData} records available, requesting data");
-                    }
-                    else if (!string.IsNullOrEmpty(deviceId))
-                    {
-                        // Simply acknowledge the status message if no data available, using the same hex format
-                        using (var ms = new MemoryStream())
-                        {
-                            // #A prefix (0x23 0x41)
-                            ms.WriteByte(0x23); // #
-                            ms.WriteByte(0x41); // A
-
-                            // Separator (0xAA)
-                            ms.WriteByte(0xAA);
-
-                            // Device ID bytes
-                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
-                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
-
-                            // Second separator (0xAA)
-                            ms.WriteByte(0xAA);
-
-                            // Line feed (0x0A)
-                            ms.WriteByte(0x0A);
-
-                            responseData = ms.ToArray();
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Could not extract device ID from status message, no response sent");
-                    }
-                }
-                // Handle data messages
-                else if (receivedMessage.StartsWith("#D"))
-                {
-                    // Extract device ID from data message
-                    var parts = receivedMessage.Contains(SEPARATOR)
-                        ? receivedMessage.Split(SEPARATOR)
-                        : receivedMessage.Split(QUESTION_SEPARATOR);
-
+                    char separator = receivedMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
+                    var parts = receivedMessage.Split(separator);
                     if (parts.Length > 1)
                     {
                         deviceId = parts[1];
                     }
-
-                    // Send acknowledgment for data messages if we have a device ID
-                    if (!string.IsNullOrEmpty(deviceId))
-                    {
-                        // Create acknowledgment message in hex format
-                        using (var ms = new MemoryStream())
-                        {
-                            // #A prefix (0x23 0x41)
-                            ms.WriteByte(0x23); // #
-                            ms.WriteByte(0x41); // A
-
-                            // Separator (0xAA)
-                            ms.WriteByte(0xAA);
-
-                            // Device ID bytes
-                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
-                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
-
-                            // Second separator (0xAA)
-                            ms.WriteByte(0xAA);
-
-                            // Line feed (0x0A)
-                            ms.WriteByte(0x0A);
-
-                            responseData = ms.ToArray();
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Could not extract device ID from data message, no response sent");
-                    }
-                }
-                // Handle "no more data" messages from device
-                else if (receivedMessage.StartsWith("#U"))
-                {
-                    // Extract device ID from no more data message
-                    var parts = receivedMessage.Contains(SEPARATOR)
-                        ? receivedMessage.Split(SEPARATOR)
-                        : receivedMessage.Split(QUESTION_SEPARATOR);
-
-                    if (parts.Length > 1)
-                    {
-                        deviceId = parts[1];
-                        _logger.LogInformation($"Device {deviceId} has no more data to send");
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Could not extract device ID from no more data message");
-                    }
-
-                    // No response needed for "no more data" message
-                }
-                // Handle data request
-                else if (receivedMessage.StartsWith("#u"))
-                {
-                    // Extract device ID from request message
-                    var parts = receivedMessage.Contains(SEPARATOR)
-                        ? receivedMessage.Split(SEPARATOR)
-                        : receivedMessage.Split(QUESTION_SEPARATOR);
-
-                    if (parts.Length > 1)
-                    {
-                        deviceId = parts[1];
-                    }
-
-                    // This is a request from us to the device, no direct response needed
-                    // The device should respond with data or "no more data" message
                 }
 
-                // Send the response if it's not empty
-                if (responseData != null && responseData.Length > 0)
+                // Create a generic acknowledgment message in hex format if we have a device ID
+                if (!string.IsNullOrEmpty(deviceId))
                 {
-                    // Log the actual bytes being sent for debugging
-                    _logger.LogDebug($"Sending bytes: {BitConverter.ToString(responseData)}");
-
-                    await client.GetStream().WriteAsync(responseData, 0, responseData.Length, stoppingToken);
-
-                    // Log with appropriate identifier
-                    if (!string.IsNullOrEmpty(deviceId))
+                    using (var ms = new MemoryStream())
                     {
-                        _logger.LogInformation($"Sent binary response to {deviceId}: {BitConverter.ToString(responseData)}");
+                        // #A prefix (0x23 0x41)
+                        ms.WriteByte(0x23); // #
+                        ms.WriteByte(0x41); // A
+
+                        // Separator (0xAA)
+                        ms.WriteByte(0xAA);
+
+                        // Device ID bytes
+                        byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                        ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                        // Second separator (0xAA)
+                        ms.WriteByte(0xAA);
+
+                        // Line feed (0x0A)
+                        ms.WriteByte(0x0A);
+
+                        responseData = ms.ToArray();
                     }
-                    else
+
+                    // Send the response
+                    if (responseData != null && responseData.Length > 0)
                     {
-                        _logger.LogInformation($"Sent binary response to client {clientIP}: {BitConverter.ToString(responseData)}");
+                        await client.GetStream().WriteAsync(responseData, 0, responseData.Length, stoppingToken);
+                        _logger.LogInformation($"Sent acknowledgment to {deviceId}: {BitConverter.ToString(responseData)}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error sending response to client {clientIP}");
-            }
-        }
-
-        // Helper method to parse the number of available data records from a status message
-        // and also return the device ID
-        private (int availableData, string deviceId) ParseStatusMessage(string statusMessage)
-        {
-            try
-            {
-                // Expected formats: 
-                // #S\u00AALD0000000\u00AA0\u00AA14:18:2826:02:2025\u00AA1\u00AAD7ý
-                // #S\u003FLD0000000\u003F0\u003F02:05:5901:01:2020\u003F1\u003FC7\u003F
-
-                // Determine which separator is being used
-                char separator = statusMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
-                var parts = statusMessage.Split(separator);
-
-                // Log the parsing for debugging
-                _logger.LogDebug($"Parsing status message with separator '{separator}', found {parts.Length} parts");
-
-                string deviceId = string.Empty;
-                int availableData = 0;
-
-                // Device ID should be at index 1
-                if (parts.Length > 1)
-                {
-                    deviceId = parts[1];
-                    _logger.LogDebug($"Extracted device ID: {deviceId}");
-                }
-
-                // AvailableData should be at index 4
-                if (parts.Length > 4 && int.TryParse(parts[4], out int parsedData))
-                {
-                    availableData = parsedData;
-                    _logger.LogDebug($"Extracted available data count: {availableData}");
-                }
-
-                return (availableData, deviceId);
-            }
-            catch (Exception ex)
-            {
-                // Log parsing error but don't crash
-                _logger.LogError(ex, "Error parsing status message");
-                return (0, string.Empty); // Return empty values as fallback
+                _logger.LogError(ex, $"Error sending acknowledgment to client {clientIP}");
             }
         }
     }
