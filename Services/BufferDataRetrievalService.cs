@@ -62,11 +62,10 @@ namespace DeviceDataCollector.Services
 
                     using (var stream = client.GetStream())
                     {
-                        // Send the buffer request message: #uªSNªLF
-                        // The 'ª' character has hex value 0xFD
+                        // Send the buffer request message in hex format: #u (0x23 0x75) + separator (0xAA) + deviceId + separator (0xAA) + LF (0x0A)
                         byte[] dataRequestCommand = { 0x23, 0x75 }; // #u in ASCII
                         byte[] deviceId = Encoding.ASCII.GetBytes(device.SerialNumber);
-                        byte[] separator = { 0xFD }; // ª character
+                        byte[] separator = { 0xAA }; // Hex for the separator
                         byte[] lineFeed = { 0x0A }; // LF character
 
                         // Combine all parts
@@ -80,6 +79,9 @@ namespace DeviceDataCollector.Services
 
                             byte[] requestMessage = ms.ToArray();
                             await stream.WriteAsync(requestMessage, 0, requestMessage.Length);
+
+                            // Log the message in hex format for debugging
+                            _logger.LogInformation($"Sent binary request message to {device.SerialNumber}: {BitConverter.ToString(requestMessage)}");
                         }
 
                         _logger.LogInformation($"Sent buffer request to {device.SerialNumber}");
@@ -114,22 +116,31 @@ namespace DeviceDataCollector.Services
                                     dataCount++;
                                     await ProcessMessageAsync(response, ipAddress, _port);
 
-                                    // Send acknowledgment: #AªSNªLF
-                                    byte[] ackCommand = { 0x23, 0x41 }; // #A in ASCII
-
+                                    // Send acknowledgment in hex format: #A (0x23 0x41) + separator (0xAA) + deviceId + separator (0xAA) + LF (0x0A)
                                     using (var ms = new MemoryStream())
                                     {
-                                        ms.Write(ackCommand, 0, ackCommand.Length);
-                                        ms.Write(separator, 0, separator.Length);
+                                        // #A prefix (0x23 0x41)
+                                        ms.WriteByte(0x23); // #
+                                        ms.WriteByte(0x41); // A
+
+                                        // Separator (0xAA)
+                                        ms.WriteByte(0xAA);
+
+                                        // Device ID bytes
                                         ms.Write(deviceId, 0, deviceId.Length);
-                                        ms.Write(separator, 0, separator.Length);
-                                        ms.Write(lineFeed, 0, lineFeed.Length);
+
+                                        // Second separator (0xAA)
+                                        ms.WriteByte(0xAA);
+
+                                        // Line feed (0x0A)
+                                        ms.WriteByte(0x0A);
 
                                         byte[] ackMessage = ms.ToArray();
                                         await stream.WriteAsync(ackMessage, 0, ackMessage.Length);
-                                    }
 
-                                    _logger.LogInformation($"Sent acknowledgment to {device.SerialNumber}");
+                                        // Log the acknowledgment in hex format
+                                        _logger.LogInformation($"Sent binary acknowledgment to {device.SerialNumber}: {BitConverter.ToString(ackMessage)}");
+                                    }
                                 }
                                 else
                                 {

@@ -16,6 +16,12 @@ namespace DeviceDataCollector.Services
         private readonly string _ipAddress = string.Empty;
         private readonly HashSet<string> _appIpAddresses;
 
+        // Added to prevent duplicate processing
+        private readonly HashSet<string> _processedMessageHashes = new HashSet<string>();
+        private readonly object _lockObject = new object();
+        private readonly TimeSpan _messageHashExpiration = TimeSpan.FromMinutes(5); // Messages older than this will be processed again
+        private Timer? _cleanupTimer;
+
         // Define the separator characters consistently across the service
         private const char SEPARATOR = '\u00AA'; // Unicode 170 - this is the special separator character
         private const char QUESTION_SEPARATOR = '\u003F'; // Unicode 63 - Question mark separator
@@ -55,6 +61,9 @@ namespace DeviceDataCollector.Services
 
                 _logger.LogInformation($"TCP Server listening on {_ipAddress}:{_port}");
 
+                // Start timer to clean up old message hashes
+                _cleanupTimer = new Timer(CleanupOldMessageHashes, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     TcpClient client = await _server.AcceptTcpClientAsync(stoppingToken);
@@ -72,7 +81,28 @@ namespace DeviceDataCollector.Services
             finally
             {
                 _server?.Stop();
+                _cleanupTimer?.Dispose();
                 _logger.LogInformation("TCP Server Service is stopping...");
+            }
+        }
+
+        private void CleanupOldMessageHashes(object? state)
+        {
+            try
+            {
+                // Remove message hashes older than expiration time
+                lock (_lockObject)
+                {
+                    if (_processedMessageHashes.Count > 1000)
+                    {
+                        _logger.LogInformation($"Clearing message hash cache (size: {_processedMessageHashes.Count})");
+                        _processedMessageHashes.Clear();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up message hashes");
             }
         }
 
@@ -83,6 +113,11 @@ namespace DeviceDataCollector.Services
 
             // Log all connections for debugging
             _logger.LogInformation($"Client connected: {clientIP}:{clientPort}");
+
+            // Register device even without data - this is a temporary ID until we get a real one
+            string tempDeviceId = $"Device_{clientIP.Replace('.', '_')}";
+            _logger.LogInformation($"Attempting immediate device registration with temporary ID: {tempDeviceId}");
+            await ForceRegisterDeviceAsync(tempDeviceId, clientIP, clientPort);
 
             using NetworkStream stream = client.GetStream();
             byte[] buffer = new byte[4096];
@@ -99,11 +134,34 @@ namespace DeviceDataCollector.Services
                     string data = Encoding.ASCII.GetString(buffer, 0, bytesRead);
                     _logger.LogInformation($"Received from {clientIP}:{clientPort}: {data}");
 
-                    // Process and store the data
-                    await ProcessDeviceMessageAsync(data, clientIP, clientPort);
+                    // Generate a unique hash for this message to prevent duplicates
+                    string messageHash = ComputeMessageHash(data, clientIP, clientPort);
+                    bool isNewMessage = false;
 
-                    // Send acknowledgment based on message type
-                    await SendResponseAsync(client, data, clientIP, stoppingToken);
+                    lock (_lockObject)
+                    {
+                        if (!_processedMessageHashes.Contains(messageHash))
+                        {
+                            _processedMessageHashes.Add(messageHash);
+                            isNewMessage = true;
+                        }
+                    }
+
+                    if (isNewMessage)
+                    {
+                        // Process and store the data
+                        await ProcessDeviceMessageAsync(data, clientIP, clientPort);
+
+                        // Send acknowledgment based on message type
+                        await SendResponseAsync(client, data, clientIP, stoppingToken);
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"Skipping duplicate message from {clientIP}:{clientPort}: {messageHash}");
+
+                        // Still send acknowledgment so device doesn't retry
+                        await SendResponseAsync(client, data, clientIP, stoppingToken);
+                    }
                 }
             }
             catch (Exception ex)
@@ -118,6 +176,18 @@ namespace DeviceDataCollector.Services
                 client.Close();
                 _logger.LogInformation($"Client disconnected: {clientIP}:{clientPort}");
             }
+        }
+
+        private string ComputeMessageHash(string message, string ipAddress, int port)
+        {
+            // Create a hash to identify this exact message
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            string uniqueString = $"{message}|{ipAddress}|{port}|{DateTime.Now:yyyy-MM-dd}";
+            byte[] inputBytes = Encoding.UTF8.GetBytes(uniqueString);
+            byte[] hashBytes = sha.ComputeHash(inputBytes);
+
+            // Convert to hex string
+            return BitConverter.ToString(hashBytes).Replace("-", "");
         }
 
         private async Task ProcessDeviceMessageAsync(string message, string ipAddress, int port)
@@ -229,11 +299,71 @@ namespace DeviceDataCollector.Services
             }
         }
 
+        private async Task ForceRegisterDeviceAsync(string deviceId, string ipAddress, int port)
+        {
+            _logger.LogInformation($"Force registering device: {deviceId} from {ipAddress}:{port}");
+
+            try
+            {
+                // Create a new scope to resolve the dependencies
+                using var scope = _scopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                // First check if this device already exists by serial number
+                var existingDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == deviceId);
+
+                // Also check if we might have a device with matching IP in notes
+                if (existingDevice == null)
+                {
+                    existingDevice = await dbContext.Devices.FirstOrDefaultAsync(
+                        d => d.Notes != null && d.Notes.Contains($"Last IP: {ipAddress}"));
+                }
+
+                if (existingDevice == null)
+                {
+                    // Register the device with default values
+                    var device = new Device
+                    {
+                        SerialNumber = deviceId,
+                        Name = $"Device at {ipAddress}",
+                        RegisteredDate = DateTime.Now,
+                        LastConnectionTime = DateTime.Now,
+                        IsActive = true,
+                        Notes = $"Automatically registered\nLast IP: {ipAddress}\nLast Port: {port}\nRegistered on: {DateTime.Now}"
+                    };
+
+                    dbContext.Devices.Add(device);
+                    await dbContext.SaveChangesAsync();
+                    _logger.LogInformation($"*** NEW DEVICE REGISTERED: {deviceId} ***");
+                }
+                else
+                {
+                    _logger.LogInformation($"Updating existing device: {deviceId}");
+
+                    // Update the device
+                    existingDevice.LastConnectionTime = DateTime.Now;
+
+                    // Optionally update notes with the new IP
+                    if (existingDevice.SerialNumber == deviceId)
+                    {
+                        existingDevice.Notes = existingDevice.Notes?.Replace(
+                            $"Last IP:", $"Previous IP:") + $"\nLast IP: {ipAddress}\nLast update: {DateTime.Now}";
+                    }
+
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error registering temporary device: {ex.Message}");
+            }
+        }
+
         private async Task SendResponseAsync(TcpClient client, string receivedMessage, string clientIP, CancellationToken stoppingToken)
         {
             try
             {
-                string response = string.Empty;
+                byte[] responseData = null;
                 string deviceId = string.Empty;
 
                 // Handle status messages
@@ -245,17 +375,56 @@ namespace DeviceDataCollector.Services
 
                     if (!string.IsNullOrEmpty(deviceId) && availableData > 0)
                     {
-                        // Request data from device if there's available data
-                        // Format: #u\u00AASN\u00AA\u000A (where \u000A is a line feed)
-                        response = $"#u{SEPARATOR}{deviceId}{SEPARATOR}{LINE_FEED}";
+                        // Request data from device if there's available data using hex format:
+                        // #u (0x23 0x75) + separator (0xAA) + deviceId bytes + separator (0xAA) + LF (0x0A)
+                        using (var ms = new MemoryStream())
+                        {
+                            // #u prefix (0x23 0x75)
+                            ms.WriteByte(0x23); // #
+                            ms.WriteByte(0x75); // u
+
+                            // Separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Device ID bytes
+                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                            // Second separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Line feed (0x0A)
+                            ms.WriteByte(0x0A);
+
+                            responseData = ms.ToArray();
+                        }
+
                         _logger.LogInformation($"Device has {availableData} records available, requesting data");
                     }
                     else if (!string.IsNullOrEmpty(deviceId))
                     {
-                        // Simply acknowledge the status message if no data available
-                        // Format: #A\u00AASN\u00AA\u000A
-                        char separator = receivedMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
-                        response = $"#A{separator}{deviceId}{separator}{LINE_FEED}";
+                        // Simply acknowledge the status message if no data available, using the same hex format
+                        using (var ms = new MemoryStream())
+                        {
+                            // #A prefix (0x23 0x41)
+                            ms.WriteByte(0x23); // #
+                            ms.WriteByte(0x41); // A
+
+                            // Separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Device ID bytes
+                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                            // Second separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Line feed (0x0A)
+                            ms.WriteByte(0x0A);
+
+                            responseData = ms.ToArray();
+                        }
                     }
                     else
                     {
@@ -275,15 +444,31 @@ namespace DeviceDataCollector.Services
                         deviceId = parts[1];
                     }
 
-                    // Store the data message in the database
-                    await StoreDeviceDataAsync(receivedMessage, client);
-
                     // Send acknowledgment for data messages if we have a device ID
                     if (!string.IsNullOrEmpty(deviceId))
                     {
-                        // Format: #A\u00AASN\u00AA\u000A
-                        char separator = receivedMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
-                        response = $"#A{separator}{deviceId}{separator}{LINE_FEED}";
+                        // Create acknowledgment message in hex format
+                        using (var ms = new MemoryStream())
+                        {
+                            // #A prefix (0x23 0x41)
+                            ms.WriteByte(0x23); // #
+                            ms.WriteByte(0x41); // A
+
+                            // Separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Device ID bytes
+                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                            // Second separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Line feed (0x0A)
+                            ms.WriteByte(0x0A);
+
+                            responseData = ms.ToArray();
+                        }
                     }
                     else
                     {
@@ -328,11 +513,8 @@ namespace DeviceDataCollector.Services
                 }
 
                 // Send the response if it's not empty
-                if (!string.IsNullOrEmpty(response))
+                if (responseData != null && responseData.Length > 0)
                 {
-                    // Explicitly encode using ASCII
-                    byte[] responseData = Encoding.ASCII.GetBytes(response);
-
                     // Log the actual bytes being sent for debugging
                     _logger.LogDebug($"Sending bytes: {BitConverter.ToString(responseData)}");
 
@@ -341,11 +523,11 @@ namespace DeviceDataCollector.Services
                     // Log with appropriate identifier
                     if (!string.IsNullOrEmpty(deviceId))
                     {
-                        _logger.LogInformation($"Sent response to {deviceId}: {response.Replace(LINE_FEED, '\u2193')}"); // Replace LF with ↓ (Unicode U+2193) for readable logging
+                        _logger.LogInformation($"Sent binary response to {deviceId}: {BitConverter.ToString(responseData)}");
                     }
                     else
                     {
-                        _logger.LogInformation($"Sent response to client {clientIP}: {response.Replace(LINE_FEED, '\u2193')}");
+                        _logger.LogInformation($"Sent binary response to client {clientIP}: {BitConverter.ToString(responseData)}");
                     }
                 }
             }
@@ -397,16 +579,6 @@ namespace DeviceDataCollector.Services
                 _logger.LogError(ex, "Error parsing status message");
                 return (0, string.Empty); // Return empty values as fallback
             }
-        }
-
-        // Helper method to store device data in the database
-        private async Task StoreDeviceDataAsync(string dataMessage, TcpClient client)
-        {
-            string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString();
-            int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port;
-
-            // Use existing ProcessDeviceMessageAsync to handle storing the data
-            await ProcessDeviceMessageAsync(dataMessage, clientIP, clientPort);
         }
     }
 }

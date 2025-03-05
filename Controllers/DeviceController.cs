@@ -22,7 +22,7 @@ namespace DeviceDataCollector.Controllers
         public IActionResult SendMessage()
         {
             // Get the default IP from config for the view
-            ViewBag.DefaultTargetIP = "127.0.0.3";
+            ViewBag.DefaultTargetIP = "192.168.1.101";
             ViewBag.DefaultPort = 5000;
             ViewBag.AppIP = _configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2");
             // ViewBag.HerculesIP = "127.0.0.3";

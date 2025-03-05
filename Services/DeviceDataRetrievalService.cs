@@ -149,12 +149,30 @@ namespace DeviceDataCollector.Services
 
                     using (var stream = client.GetStream())
                     {
-                        // Send data request message: #uªSNªLF
-                        string requestMessage = $"#u|{deviceId}\r\n";
-                        byte[] requestData = Encoding.ASCII.GetBytes(requestMessage);
+                        // Send data request message in hex format: #u (0x23 0x75) + separator (0xAA) + deviceId + separator (0xAA) + LF (0x0A)
+                        using (var ms = new MemoryStream())
+                        {
+                            // #u prefix (0x23 0x75)
+                            ms.WriteByte(0x23); // #
+                            ms.WriteByte(0x75); // u
 
-                        await stream.WriteAsync(requestData, 0, requestData.Length);
-                        _logger.LogInformation($"Sent data request to {deviceId}: {requestMessage.Trim()}");
+                            // Separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Device ID bytes
+                            byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                            ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                            // Second separator (0xAA)
+                            ms.WriteByte(0xAA);
+
+                            // Line feed (0x0A)
+                            ms.WriteByte(0x0A);
+
+                            byte[] requestData = ms.ToArray();
+                            await stream.WriteAsync(requestData, 0, requestData.Length);
+                            _logger.LogInformation($"Sent binary data request to {deviceId}: {BitConverter.ToString(requestData)}");
+                        }
 
                         // Read responses until we get a #U message (no more data)
                         bool moreData = true;
@@ -196,19 +214,57 @@ namespace DeviceDataCollector.Services
                                 await ProcessDeviceMessageAsync(response, ipAddress, port);
                                 dataCount++;
 
-                                // Send acknowledgment
-                                string ackMessage = $"#A|{deviceId}|\r\n";
-                                byte[] ackData = Encoding.ASCII.GetBytes(ackMessage);
-                                await stream.WriteAsync(ackData, 0, ackData.Length);
-                                _logger.LogInformation($"Sent acknowledgment to {deviceId}: {ackMessage.Trim()}");
+                                // Send acknowledgment in hex format
+                                using (var ms = new MemoryStream())
+                                {
+                                    // #A prefix (0x23 0x41)
+                                    ms.WriteByte(0x23); // #
+                                    ms.WriteByte(0x41); // A
+
+                                    // Separator (0xAA)
+                                    ms.WriteByte(0xAA);
+
+                                    // Device ID bytes
+                                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                                    // Second separator (0xAA)
+                                    ms.WriteByte(0xAA);
+
+                                    // Line feed (0x0A)
+                                    ms.WriteByte(0x0A);
+
+                                    byte[] ackData = ms.ToArray();
+                                    await stream.WriteAsync(ackData, 0, ackData.Length);
+                                    _logger.LogInformation($"Sent binary acknowledgment to {deviceId}: {BitConverter.ToString(ackData)}");
+                                }
                             }
                             else
                             {
                                 _logger.LogWarning($"Unexpected response from {deviceId}: {response.Trim()}");
-                                // Still send acknowledgment in case this helps
-                                string ackMessage = $"#A|{deviceId}|\r\n";
-                                byte[] ackData = Encoding.ASCII.GetBytes(ackMessage);
-                                await stream.WriteAsync(ackData, 0, ackData.Length);
+                                // Still send acknowledgment in case this helps, using hex format
+                                using (var ms = new MemoryStream())
+                                {
+                                    // #A prefix (0x23 0x41)
+                                    ms.WriteByte(0x23); // #
+                                    ms.WriteByte(0x41); // A
+
+                                    // Separator (0xAA)
+                                    ms.WriteByte(0xAA);
+
+                                    // Device ID bytes
+                                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                                    // Second separator (0xAA)
+                                    ms.WriteByte(0xAA);
+
+                                    // Line feed (0x0A)
+                                    ms.WriteByte(0x0A);
+
+                                    byte[] ackData = ms.ToArray();
+                                    await stream.WriteAsync(ackData, 0, ackData.Length);
+                                }
                             }
                         }
 
