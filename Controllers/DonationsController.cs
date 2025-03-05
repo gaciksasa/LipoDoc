@@ -10,16 +10,32 @@ namespace DeviceDataCollector.Controllers
     public class DonationsController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<DonationsController> _logger;
 
-        public DonationsController(ApplicationDbContext context)
+        public DonationsController(
+            ApplicationDbContext context,
+            ILogger<DonationsController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // GET: Donations
         public async Task<IActionResult> Index()
         {
-            return View(await _context.DonationsData.ToListAsync());
+            var donations = await _context.DonationsData
+                .OrderByDescending(d => d.Timestamp)
+                .Take(50) // Limit to most recent 50 records for performance
+                .ToListAsync();
+
+            // Check if it's an AJAX request
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                // Return the partial view for AJAX refresh
+                return PartialView("_DonationList", donations);
+            }
+
+            return View(donations);
         }
 
         // GET: Donations/Details/5
@@ -61,7 +77,7 @@ namespace DeviceDataCollector.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Policy = "RequireAdminRole")] // Only admins can edit
-        public async Task<IActionResult> Edit(int id, [Bind("Id,DeviceId,Timestamp,DataPayload,IPAddress,Port")] DonationsData donationData)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,DeviceId,Timestamp,MessageType,RawPayload,IPAddress,Port,DeviceStatus,AvailableData,IsBarcodeMode,RefCode,DonationIdBarcode,OperatorIdBarcode,LotNumber,LipemicValue,LipemicGroup,LipemicStatus,CheckSum")] DonationsData donationData)
         {
             if (id != donationData.Id)
             {
@@ -74,8 +90,9 @@ namespace DeviceDataCollector.Controllers
                 {
                     _context.Update(donationData);
                     await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Donation record {id} updated by {User.Identity.Name}");
                 }
-                catch (DbUpdateConcurrencyException)
+                catch (DbUpdateConcurrencyException ex)
                 {
                     if (!DonationsDataExists(donationData.Id))
                     {
@@ -83,6 +100,7 @@ namespace DeviceDataCollector.Controllers
                     }
                     else
                     {
+                        _logger.LogError(ex, $"Concurrency error updating donation {id}");
                         throw;
                     }
                 }
@@ -120,9 +138,10 @@ namespace DeviceDataCollector.Controllers
             if (donationData != null)
             {
                 _context.DonationsData.Remove(donationData);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation($"Donation record {id} deleted by {User.Identity.Name}");
             }
 
-            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
