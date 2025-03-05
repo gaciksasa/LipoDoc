@@ -1,0 +1,83 @@
+﻿@model IEnumerable<DeviceDataCollector.Models.Device>
+
+@{
+    ViewData["Title"] = "Merge Devices";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Index">Devices</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Merge Devices</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-white">
+            <h5 class="mb-0">Merge Devices</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Warning!</strong> Merging devices is permanent and cannot be undone. All data from the source device will be moved to the target device, and the source device will be deleted.
+            </div>
+
+            <form asp-action="MergeDevices" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="mb-3">
+                    <label for="sourceDeviceId" class="form-label">Source Device (will be deleted)</label>
+                    <select id="sourceDeviceId" name="sourceDeviceId" class="form-select" required>
+                        <option value="">-- Select Source Device --</option>
+                        @foreach (var device in Model)
+                        {
+                            <option value="@device.Id">@device.SerialNumber (@device.Name)</option>
+                        }
+                    </select>
+                    <div class="form-text">This device will be deleted after the merge.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="targetDeviceId" class="form-label">Target Device (will receive data)</label>
+                    <select id="targetDeviceId" name="targetDeviceId" class="form-select" required>
+                        <option value="">-- Select Target Device --</option>
+                        @foreach (var device in Model)
+                        {
+                            <option value="@device.Id">@device.SerialNumber (@device.Name)</option>
+                        }
+                    </select>
+                    <div class="form-text">This device will remain and contain all data from both devices.</div>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('Are you sure you want to merge these devices? This cannot be undone.')">
+                        <i class="bi bi-arrow-repeat"></i> Merge Devices
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Prevent selecting the same device for both source and target
+            $('#sourceDeviceId, #targetDeviceId').on('change', function() {
+                var sourceId = $('#sourceDeviceId').val();
+                var targetId = $('#targetDeviceId').val();
+
+                if (sourceId && targetId && sourceId === targetId) {
+                    alert('Source and target device cannot be the same');
+                    $(this).val('');
+                }
+            });
+        });
+    </script>
+}

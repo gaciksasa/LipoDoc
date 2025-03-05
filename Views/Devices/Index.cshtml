@@ -28,6 +28,12 @@
                 <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
                 <label class="form-check-label" for="autoRefreshToggle">Auto-refresh</label>
             </div>
+            @if (User.IsInRole("Admin"))
+            {
+                <a asp-action="Merge" class="btn btn-warning">
+                    <i class="bi bi-arrow-repeat"></i> Merge Devices
+                </a>
+            }
         </div>
     </div>
 

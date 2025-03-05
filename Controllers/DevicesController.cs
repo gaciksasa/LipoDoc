@@ -233,6 +233,104 @@ namespace DeviceDataCollector.Controllers
             }
         }
 
+        // POST: Devices/Merge
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> MergeDevices(int sourceDeviceId, int targetDeviceId)
+        {
+            if (sourceDeviceId == targetDeviceId)
+            {
+                TempData["ErrorMessage"] = "Cannot merge a device with itself";
+                return RedirectToAction(nameof(Index));
+            }
+
+            try
+            {
+                // Get both devices
+                var sourceDevice = await _context.Devices.FindAsync(sourceDeviceId);
+                var targetDevice = await _context.Devices.FindAsync(targetDeviceId);
+
+                if (sourceDevice == null || targetDevice == null)
+                {
+                    TempData["ErrorMessage"] = "One or both devices not found";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Log important information for reference
+                _logger.LogInformation($"Merging device {sourceDevice.SerialNumber} (ID: {sourceDevice.Id}) into {targetDevice.SerialNumber} (ID: {targetDevice.Id})");
+
+                // Update related donations data
+                var donationData = await _context.DonationsData
+                    .Where(d => d.DeviceId == sourceDevice.SerialNumber)
+                    .ToListAsync();
+
+                if (donationData.Any())
+                {
+                    foreach (var donation in donationData)
+                    {
+                        donation.DeviceId = targetDevice.SerialNumber;
+                    }
+
+                    _logger.LogInformation($"Updated {donationData.Count} donation records from {sourceDevice.SerialNumber} to {targetDevice.SerialNumber}");
+                }
+
+                // Update related status data
+                var statusData = await _context.DeviceStatuses
+                    .Where(s => s.DeviceId == sourceDevice.SerialNumber)
+                    .ToListAsync();
+
+                if (statusData.Any())
+                {
+                    foreach (var status in statusData)
+                    {
+                        status.DeviceId = targetDevice.SerialNumber;
+                    }
+
+                    _logger.LogInformation($"Updated {statusData.Count} status records from {sourceDevice.SerialNumber} to {targetDevice.SerialNumber}");
+                }
+
+                // Combine notes if available
+                if (!string.IsNullOrEmpty(sourceDevice.Notes))
+                {
+                    targetDevice.Notes = (targetDevice.Notes ?? "") +
+                        $"\n\n--- Merged with {sourceDevice.SerialNumber} on {DateTime.Now} ---\n{sourceDevice.Notes}";
+                }
+
+                // Keep the earliest registration date
+                if (sourceDevice.RegisteredDate < targetDevice.RegisteredDate)
+                {
+                    targetDevice.RegisteredDate = sourceDevice.RegisteredDate;
+                }
+
+                // Use the most recent connection time
+                if (sourceDevice.LastConnectionTime > targetDevice.LastConnectionTime)
+                {
+                    targetDevice.LastConnectionTime = sourceDevice.LastConnectionTime;
+                }
+
+                // Keep the device active if either was active
+                targetDevice.IsActive = targetDevice.IsActive || sourceDevice.IsActive;
+
+                // Delete the source device
+                _context.Devices.Remove(sourceDevice);
+
+                // Save all changes
+                await _context.SaveChangesAsync();
+
+                TempData["SuccessMessage"] = $"Successfully merged device {sourceDevice.SerialNumber} into {targetDevice.SerialNumber}";
+                _logger.LogInformation($"Device {sourceDevice.SerialNumber} merged into {targetDevice.SerialNumber} by {User.Identity.Name}");
+
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error merging devices {sourceDeviceId} and {targetDeviceId}");
+                TempData["ErrorMessage"] = $"Error merging devices: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
         // GET: Devices/Donations/5
         public async Task<IActionResult> Donations(int? id, string sortOrder, string searchString, int? pageNumber)
         {
