@@ -39,18 +39,18 @@ builder.Services.AddSingleton<TCPServerService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPServerService>());
 builder.Services.AddSingleton<DeviceStatusMonitorService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceStatusMonitorService>());
+builder.Services.AddSingleton<DeviceStatusCleanupService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceStatusCleanupService>());
 builder.Services.AddScoped<DatabaseStatusService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeviceMessageParser>();
 builder.Services.AddScoped<DeviceDataRetrievalService>();
-// Removed DevicePingService registration
-
-// Add BCrypt
 builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 
 var app = builder.Build();
 
 // Initialize database - improved to avoid recreating existing tables
+// Initialize database - improved to handle missing tables
 try
 {
     using (var scope = app.Services.CreateScope())
@@ -65,12 +65,54 @@ try
         if (!canConnect)
         {
             logger.LogWarning("Database connection failed. Will attempt to create database.");
-            // This will create the database if it doesn't exist but won't recreate tables
+            // This will create the database if it doesn't exist
             await dbContext.Database.EnsureCreatedAsync();
+            logger.LogInformation("Database created successfully.");
         }
-        else
+
+        // Explicitly check if CurrentDeviceStatuses table exists by attempting a query
+        bool currentDeviceStatusTableExists = false;
+        try
         {
-            // Check if any pending migrations need to be applied
+            // Try to query the table (this will throw an exception if it doesn't exist)
+            await dbContext.CurrentDeviceStatuses.FirstOrDefaultAsync();
+            currentDeviceStatusTableExists = true;
+        }
+        catch (Exception)
+        {
+            logger.LogWarning("CurrentDeviceStatuses table does not exist. It will be created.");
+        }
+
+        if (!currentDeviceStatusTableExists)
+        {
+            try
+            {
+                // Create the table manually using SQL
+                var createTableSql = @"
+                CREATE TABLE IF NOT EXISTS `CurrentDeviceStatuses` (
+                    `DeviceId` varchar(255) NOT NULL,
+                    `Timestamp` datetime(6) NOT NULL,
+                    `Status` int NOT NULL,
+                    `AvailableData` int NOT NULL,
+                    `IPAddress` longtext NULL,
+                    `Port` int NOT NULL,
+                    `CheckSum` longtext NULL,
+                    `StatusUpdateCount` int NOT NULL DEFAULT 0,
+                    PRIMARY KEY (`DeviceId`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+                await dbContext.Database.ExecuteSqlRawAsync(createTableSql);
+                logger.LogInformation("CurrentDeviceStatuses table created successfully.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error creating CurrentDeviceStatuses table.");
+            }
+        }
+
+        // Apply any pending migrations for other tables
+        try
+        {
             if ((await dbContext.Database.GetPendingMigrationsAsync()).Any())
             {
                 logger.LogInformation("Applying pending migrations...");
@@ -82,17 +124,9 @@ try
                 logger.LogInformation("Database is up to date. No migrations needed.");
             }
         }
-
-        // Verify table existence by performing a non-destructive query
-        try
+        catch (Exception ex)
         {
-            // Just check if any users exist - won't cause schema changes
-            var userCount = await dbContext.Users.CountAsync();
-            logger.LogInformation($"Database contains {userCount} user records.");
-        }
-        catch (Exception tableEx)
-        {
-            logger.LogError(tableEx, "Error accessing database tables. Schema may be outdated or incomplete.");
+            logger.LogError(ex, "Error applying migrations.");
         }
 
         logger.LogInformation("Database initialization completed");

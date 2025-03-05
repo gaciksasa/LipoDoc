@@ -12,6 +12,7 @@ namespace DeviceDataCollector.Data
 
         public DbSet<DonationsData> DonationsData { get; set; }
         public DbSet<DeviceStatus> DeviceStatuses { get; set; }
+        public DbSet<CurrentDeviceStatus> CurrentDeviceStatuses { get; set; }
         public DbSet<Device> Devices { get; set; }
         public DbSet<User> Users { get; set; }
 
@@ -34,6 +35,8 @@ namespace DeviceDataCollector.Data
 
             modelBuilder.Entity<DeviceStatus>()
                 .HasIndex(d => d.Timestamp);
+
+            // For the CurrentDeviceStatus table, DeviceId is already the PK
 
             // Seed admin and user accounts
             modelBuilder.Entity<User>().HasData(

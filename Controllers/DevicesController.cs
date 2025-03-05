@@ -57,13 +57,37 @@ namespace DeviceDataCollector.Controllers
                 return NotFound();
             }
 
-            // Get the latest status for this device
-            var latestStatus = await _context.DeviceStatuses
-                .Where(s => s.DeviceId == device.SerialNumber)
-                .OrderByDescending(s => s.Timestamp)
-                .FirstOrDefaultAsync();
+            // Get the latest status for this device from the CurrentDeviceStatuses table
+            var currentStatus = await _context.CurrentDeviceStatuses
+                .FirstOrDefaultAsync(s => s.DeviceId == device.SerialNumber);
 
-            ViewBag.LatestStatus = latestStatus;
+            // If no current status exists, fall back to the DeviceStatuses table (for backward compatibility)
+            if (currentStatus == null)
+            {
+                var latestStatus = await _context.DeviceStatuses
+                    .Where(s => s.DeviceId == device.SerialNumber)
+                    .OrderByDescending(s => s.Timestamp)
+                    .FirstOrDefaultAsync();
+
+                ViewBag.LatestStatus = latestStatus;
+            }
+            else
+            {
+                // Map CurrentDeviceStatus to DeviceStatus for compatibility with existing view
+                var latestStatus = new DeviceStatus
+                {
+                    DeviceId = currentStatus.DeviceId,
+                    Timestamp = currentStatus.Timestamp,
+                    Status = currentStatus.Status,
+                    AvailableData = currentStatus.AvailableData,
+                    IPAddress = currentStatus.IPAddress,
+                    Port = currentStatus.Port,
+                    CheckSum = currentStatus.CheckSum
+                };
+
+                ViewBag.LatestStatus = latestStatus;
+                ViewBag.StatusUpdateCount = currentStatus.StatusUpdateCount; // Add update count for informational purposes
+            }
 
             // Get count of readings for this device
             var readingsCount = await _context.DonationsData

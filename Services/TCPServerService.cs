@@ -206,25 +206,174 @@ namespace DeviceDataCollector.Services
                         // This is now the ONLY way devices are registered - through status messages
                         await RegisterOrUpdateDeviceFromStatusAsync(dbContext, status, ipAddress);
 
-                        // Then store the status message
-                        dbContext.DeviceStatuses.Add(status);
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"Status from {ipAddress}:{port} stored in database");
+                        // Option 1: Only update the current status instead of adding to history
+                        await UpdateCurrentDeviceStatusAsync(dbContext, status);
+
+                        // Option 2: Save to history selectively or with a different frequency
+                        // You can implement different strategies here, such as:
+                        // 1. Only save a history record if the status changed significantly
+                        // 2. Save a history record every N minutes regardless of changes
+                        // 3. Save a history record based on other business rules
+
+                        // Example of selective history recording (uncomment if needed):
+                        // await MaybeRecordStatusHistoryAsync(dbContext, status);
                     }
                     else if (parsedMessage is DonationsData donationData)
                     {
                         dbContext.DonationsData.Add(donationData);
                         await dbContext.SaveChangesAsync();
                         _logger.LogInformation($"Donation data from {ipAddress}:{port} stored in database");
-
-                        // We're not registering devices from donation data anymore
-                        // We'll only register devices from status messages
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing and storing device message");
+            }
+        }
+
+        /// Method to update the current device status with robust error handling
+        private async Task UpdateCurrentDeviceStatusAsync(ApplicationDbContext dbContext, DeviceStatus status)
+        {
+            try
+            {
+                // First check if the table exists to avoid unexpected errors
+                bool tableExists = true;
+                try
+                {
+                    // This will throw an exception if the table doesn't exist
+                    await dbContext.Database.ExecuteSqlRawAsync("SELECT 1 FROM CurrentDeviceStatuses LIMIT 1");
+                }
+                catch
+                {
+                    tableExists = false;
+                    _logger.LogWarning("CurrentDeviceStatuses table does not exist. Falling back to legacy behavior.");
+
+                    // Fall back to the old behavior - add to history
+                    dbContext.DeviceStatuses.Add(status);
+                    await dbContext.SaveChangesAsync();
+                    return;
+                }
+
+                // If we get here, the table exists
+                if (tableExists)
+                {
+                    try
+                    {
+                        // Try to find existing current status for this device
+                        var currentStatus = await dbContext.CurrentDeviceStatuses
+                            .FirstOrDefaultAsync(s => s.DeviceId == status.DeviceId);
+
+                        if (currentStatus == null)
+                        {
+                            // First status for this device, create a new record
+                            currentStatus = new CurrentDeviceStatus
+                            {
+                                DeviceId = status.DeviceId,
+                                Timestamp = status.Timestamp,
+                                Status = status.Status,
+                                AvailableData = status.AvailableData,
+                                IPAddress = status.IPAddress,
+                                Port = status.Port,
+                                CheckSum = status.CheckSum,
+                                StatusUpdateCount = 1
+                            };
+                            dbContext.CurrentDeviceStatuses.Add(currentStatus);
+                            _logger.LogInformation($"Created initial current status for device {status.DeviceId}");
+                        }
+                        else
+                        {
+                            // Update existing status
+                            currentStatus.Timestamp = status.Timestamp;
+                            currentStatus.Status = status.Status;
+                            currentStatus.AvailableData = status.AvailableData;
+                            currentStatus.IPAddress = status.IPAddress;
+                            currentStatus.Port = status.Port;
+                            currentStatus.CheckSum = status.CheckSum;
+                            currentStatus.StatusUpdateCount++; // Increment the update counter
+
+                            _logger.LogDebug($"Updated current status for device {status.DeviceId} (update #{currentStatus.StatusUpdateCount})");
+                        }
+
+                        await dbContext.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error updating current status for device {status.DeviceId}");
+
+                        // Fall back to the old behavior
+                        dbContext.DeviceStatuses.Add(status);
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Unexpected error in UpdateCurrentDeviceStatusAsync for device {status.DeviceId}");
+
+                // As a last resort, try to use the legacy approach
+                try
+                {
+                    dbContext.DeviceStatuses.Add(status);
+                    await dbContext.SaveChangesAsync();
+                    _logger.LogInformation("Used legacy approach to save device status due to error with CurrentDeviceStatuses");
+                }
+                catch (Exception innerEx)
+                {
+                    _logger.LogError(innerEx, "Failed to save device status using legacy approach as well");
+                }
+            }
+        }
+
+        // Optional: Method to selectively record status history
+        private async Task MaybeRecordStatusHistoryAsync(ApplicationDbContext dbContext, DeviceStatus status)
+        {
+            try
+            {
+                // Get the most recent status for this device from history
+                var lastStatus = await dbContext.DeviceStatuses
+                    .Where(s => s.DeviceId == status.DeviceId)
+                    .OrderByDescending(s => s.Timestamp)
+                    .FirstOrDefaultAsync();
+
+                bool shouldRecordHistory = false;
+
+                // Record history if:
+                // 1. First status for this device
+                if (lastStatus == null)
+                {
+                    shouldRecordHistory = true;
+                    _logger.LogInformation($"Recording first history entry for device {status.DeviceId}");
+                }
+                // 2. Status value changed
+                else if (lastStatus.Status != status.Status)
+                {
+                    shouldRecordHistory = true;
+                    _logger.LogInformation($"Recording history due to status change: {lastStatus.Status} -> {status.Status}");
+                }
+                // 3. Available data count changed significantly
+                else if (Math.Abs(lastStatus.AvailableData - status.AvailableData) > 5)
+                {
+                    shouldRecordHistory = true;
+                    _logger.LogInformation($"Recording history due to available data change: {lastStatus.AvailableData} -> {status.AvailableData}");
+                }
+                // 4. It's been at least 1 hour since the last status record
+                else if ((status.Timestamp - lastStatus.Timestamp).TotalHours >= 1)
+                {
+                    shouldRecordHistory = true;
+                    _logger.LogInformation($"Recording periodic history entry (hourly) for device {status.DeviceId}");
+                }
+
+                if (shouldRecordHistory)
+                {
+                    // Add to history
+                    dbContext.DeviceStatuses.Add(status);
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in status history decision for device {status.DeviceId}");
             }
         }
 
