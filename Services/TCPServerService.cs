@@ -153,8 +153,6 @@ namespace DeviceDataCollector.Services
                     }
                     else
                     {
-                        _logger.LogWarning($"Skipping duplicate message from {clientIP}:{clientPort}: {messageHash}");
-
                         // Still send acknowledgment so device doesn't retry
                         await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
                     }
