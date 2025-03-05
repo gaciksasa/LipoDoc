@@ -14,11 +14,11 @@ namespace DeviceDataCollector.Models
 
         public string? Location { get; set; } // Location of the device
 
-        public DateTime? LastConnectionTime { get; set; } // Last time the device connected
+        public DateTime? LastConnectionTime { get; set; } // Last time the device connected - Updated by status messages
 
         public DateTime RegisteredDate { get; set; } = DateTime.Now; // Using local time instead of UTC
 
-        public bool IsActive { get; set; } = true;
+        public bool IsActive { get; set; } = true; // Active by default when registered via status message
 
         public string? Notes { get; set; }
     }

@@ -115,17 +115,6 @@ namespace DeviceDataCollector.Services
             // Log all connections for debugging
             _logger.LogInformation($"Client connected: {clientIP}:{clientPort}");
 
-            // Register device even without data - this is a temporary ID until we get a real one
-            string tempDeviceId = $"Device_{clientIP.Replace('.', '_')}";
-            _logger.LogInformation($"Attempting immediate device registration with temporary ID: {tempDeviceId}");
-
-            // Create a new scope to resolve the dependencies
-            using var scope = _scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-            // Register the temporary device
-            await EnsureDeviceRegisteredAsync(dbContext, tempDeviceId, clientIP);
-
             using NetworkStream stream = client.GetStream();
             byte[] buffer = new byte[4096];
 
@@ -213,12 +202,14 @@ namespace DeviceDataCollector.Services
                 {
                     if (parsedMessage is DeviceStatus status)
                     {
+                        // First, register or update device status based on the status message
+                        // This is now the ONLY way devices are registered - through status messages
+                        await RegisterOrUpdateDeviceFromStatusAsync(dbContext, status, ipAddress);
+
+                        // Then store the status message
                         dbContext.DeviceStatuses.Add(status);
                         await dbContext.SaveChangesAsync();
                         _logger.LogInformation($"Status from {ipAddress}:{port} stored in database");
-
-                        // Also check if we have the device registered - pass the current IP address
-                        await EnsureDeviceRegisteredAsync(dbContext, status.DeviceId, ipAddress);
                     }
                     else if (parsedMessage is DonationsData donationData)
                     {
@@ -226,8 +217,8 @@ namespace DeviceDataCollector.Services
                         await dbContext.SaveChangesAsync();
                         _logger.LogInformation($"Donation data from {ipAddress}:{port} stored in database");
 
-                        // Also check if we have the device registered - pass the current IP address
-                        await EnsureDeviceRegisteredAsync(dbContext, donationData.DeviceId, ipAddress);
+                        // We're not registering devices from donation data anymore
+                        // We'll only register devices from status messages
                     }
                 }
             }
@@ -237,10 +228,10 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        private async Task EnsureDeviceRegisteredAsync(ApplicationDbContext dbContext, string deviceId, string currentIpAddress)
+        private async Task RegisterOrUpdateDeviceFromStatusAsync(ApplicationDbContext dbContext, DeviceStatus status, string currentIpAddress)
         {
-            // Add detailed logging at the beginning of the method
-            _logger.LogInformation($"Ensuring device registration for ID: {deviceId} from IP: {currentIpAddress}");
+            string deviceId = status.DeviceId;
+            _logger.LogInformation($"Processing device registration for device ID: {deviceId} from IP: {currentIpAddress}");
 
             if (string.IsNullOrWhiteSpace(deviceId))
             {
@@ -250,125 +241,42 @@ namespace DeviceDataCollector.Services
 
             try
             {
-                // Don't do anything special for temporary device IDs
-                if (deviceId.StartsWith("Device_"))
-                {
-                    // Check if this device already exists
-                    var tempDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == deviceId);
-                    if (tempDevice == null)
-                    {
-                        // Register as a new temporary device
-                        _logger.LogInformation($"Registering new temporary device: {deviceId}");
-                        var device = new Device
-                        {
-                            SerialNumber = deviceId,
-                            Name = $"Device at {currentIpAddress}",
-                            RegisteredDate = DateTime.Now,
-                            LastConnectionTime = DateTime.Now,
-                            IsActive = true,
-                            Notes = $"Temporary device registration\nIP: {currentIpAddress}\nRegistered: {DateTime.Now}"
-                        };
-
-                        dbContext.Devices.Add(device);
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"✅ SUCCESS: New temporary device registered: {deviceId}");
-                    }
-                    else
-                    {
-                        // Update existing temporary device
-                        tempDevice.LastConnectionTime = DateTime.Now;
-                        tempDevice.IsActive = true;
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"✅ SUCCESS: Updated temporary device {deviceId}");
-                    }
-                    return;
-                }
-
-                // For real device IDs (not starting with "Device_")
-
-                // 1. Check if this real device already exists
+                // Check if this device already exists
                 var existingDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == deviceId);
-
-                // 2. Find any temporary device with matching IP in data records
-                var tempDevices = await dbContext.DonationsData
-                    .Where(d => d.IPAddress == currentIpAddress && d.DeviceId.StartsWith("Device_"))
-                    .Select(d => d.DeviceId)
-                    .Distinct()
-                    .ToListAsync();
-
-                // 3. Also check for temporary devices based on a naming pattern
-                var tempIdFromIP = $"Device_{currentIpAddress.Replace('.', '_')}";
-                var ipBasedTempDevice = await dbContext.Devices
-                    .FirstOrDefaultAsync(d => d.SerialNumber == tempIdFromIP);
-
-                if (ipBasedTempDevice != null && !tempDevices.Contains(ipBasedTempDevice.SerialNumber))
-                {
-                    tempDevices.Add(ipBasedTempDevice.SerialNumber);
-                }
-
-                // Log found temporary devices
-                if (tempDevices.Any())
-                {
-                    _logger.LogInformation($"Found {tempDevices.Count} temporary devices for IP {currentIpAddress}: {string.Join(", ", tempDevices)}");
-                }
 
                 if (existingDevice == null)
                 {
-                    // Create a new device entry for this real device ID
-                    var newDevice = new Device
+                    // Register a new device
+                    _logger.LogInformation($"Registering new device: {deviceId}");
+                    var device = new Device
                     {
                         SerialNumber = deviceId,
                         Name = $"Device {deviceId}",
                         RegisteredDate = DateTime.Now,
                         LastConnectionTime = DateTime.Now,
                         IsActive = true,
-                        Notes = $"Real device from {currentIpAddress}\nRegistered: {DateTime.Now}"
+                        Notes = $"Device auto-registered from status message\nIP: {currentIpAddress}\nRegistered: {DateTime.Now}\nStatus: ACTIVE"
                     };
 
-                    dbContext.Devices.Add(newDevice);
+                    dbContext.Devices.Add(device);
                     await dbContext.SaveChangesAsync();
-                    _logger.LogInformation($"✅ SUCCESS: New real device registered: {deviceId}");
-
-                    // Now delete any temporary devices for this IP
-                    foreach (var tempDeviceId in tempDevices)
-                    {
-                        var tempDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == tempDeviceId);
-                        if (tempDevice != null)
-                        {
-                            _logger.LogWarning($"⚠️ Removing temporary device {tempDeviceId} that was replaced by {deviceId}");
-                            dbContext.Devices.Remove(tempDevice);
-                        }
-                    }
-
-                    if (tempDevices.Any())
-                    {
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"✅ SUCCESS: Removed {tempDevices.Count} temporary devices after registering real device {deviceId}");
-                    }
+                    _logger.LogInformation($"✅ SUCCESS: New device registered: {deviceId}");
                 }
                 else
                 {
-                    // Update the existing real device
+                    // Update existing device status
+                    bool wasInactive = !existingDevice.IsActive;
                     existingDevice.LastConnectionTime = DateTime.Now;
                     existingDevice.IsActive = true;
                     await dbContext.SaveChangesAsync();
-                    _logger.LogInformation($"✅ SUCCESS: Updated real device {deviceId}");
 
-                    // Still clean up any temporary devices
-                    foreach (var tempDeviceId in tempDevices)
+                    if (wasInactive)
                     {
-                        var tempDevice = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == tempDeviceId);
-                        if (tempDevice != null)
-                        {
-                            _logger.LogWarning($"⚠️ Removing temporary device {tempDeviceId} that duplicates {deviceId}");
-                            dbContext.Devices.Remove(tempDevice);
-                        }
+                        _logger.LogInformation($"✅ SUCCESS: Device {deviceId} marked as ACTIVE after receiving status message");
                     }
-
-                    if (tempDevices.Any())
+                    else
                     {
-                        await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"✅ SUCCESS: Removed {tempDevices.Count} temporary devices for existing device {deviceId}");
+                        _logger.LogInformation($"✅ SUCCESS: Updated device {deviceId} last connection time");
                     }
                 }
             }

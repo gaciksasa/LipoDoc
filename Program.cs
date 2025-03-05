@@ -37,11 +37,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Register services
 builder.Services.AddSingleton<TCPServerService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<TCPServerService>());
+builder.Services.AddSingleton<DeviceStatusMonitorService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<DeviceStatusMonitorService>());
 builder.Services.AddScoped<DatabaseStatusService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeviceMessageParser>();
 builder.Services.AddScoped<DeviceDataRetrievalService>();
-builder.Services.AddHostedService<DevicePingService>();
+// Removed DevicePingService registration
 
 // Add BCrypt
 builder.Services.AddScoped<BCrypt.Net.BCrypt>();
