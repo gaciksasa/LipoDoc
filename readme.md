@@ -1,39 +1,77 @@
+# Blood Donation Data Collector
+
+A .NET 8 web application designed to collect, store, and manage data from blood donation devices over TCP/IP.
+
+## Overview
+
+The Blood Donation Data Collector is a centralized system that provides:
+
+- Real-time data collection from blood lipemic testing devices
+- Secure data storage in a MySQL database
+- User-friendly web interface for monitoring and managing devices
+- Role-based access control for system security
+- Comprehensive donation data analytics and reporting
+
+This application serves as a hub for blood donation centers to monitor their testing devices, collect lipemic test results, and ensure data integrity across multiple locations.
+
+## System Features
+
+### Device Communication
+- TCP/IP server that listens for incoming connections from testing devices
+- Automatic device registration and status tracking
+- Support for various message formats using standardized protocols
+- Buffered data retrieval for devices with intermittent connectivity
+
+### Data Management
+- Automatic parsing and storage of device messages
+- Comprehensive blood donation test data storage
+- Device status monitoring and tracking
+- Historical data retention and cleanup
+
+### Web Interface
+- Real-time device monitoring dashboard
+- Detailed donation data visualization
+- Device management and configuration
+- User-friendly navigation and responsive design
+
+### Security
+- Role-based authentication system (Admin/User roles)
+- Secure password storage with BCrypt hashing
+- Protected routes and views based on user permissions
+- Audit logging for sensitive operations
+
+## System Architecture
+
+The application consists of:
+
+1. **Web Interface** - Built with ASP.NET MVC
+2. **TCP Server** - Background service for device communication
+3. **Database** - MySQL with Entity Framework Core
+4. **Background Services** - For monitoring, cleanup, and maintenance tasks
+
 ## Database Schema
 
-The application uses the following database schema:
+The application uses the following key tables:
 
-### DeviceData
+### DonationsData
 Stores the lipemic test results from blood donation devices:
 - ID (auto-generated primary key)
 - DeviceId (serial number of the device)
 - Timestamp (when data was received)
 - MessageType (the type of message: "#S", "#D", etc.)
 - RawPayload (the raw message content)
-- IPAddress (source IP)
-- Port (source port)
-- DeviceStatus (0=IDLE, 1=Process in progress, 2=Process completed)
-- AvailableData (number of readings buffered in the device)
-- IsBarcodeMode (whether barcode mode is enabled)
-- RefCode (reference code barcode)
-- DonationIdBarcode (donation ID barcode)
-- OperatorIdBarcode (operator ID barcode)
-- LotNumber (lot number barcode)
-- LipemicValue (value of lipemic reading)
-- LipemicGroup (lipemic group: I, II, III, or IV)
-- LipemicStatus (LIPEMIC or PASSED)
-- CheckSum (checksum from the device)
+- IP/Port information
+- Device status information
+- Barcode data (donation ID, operator ID, ref code, lot number)
+- Lipemic test results (value, group, status)
 
-### DeviceStatus
+### DeviceStatus / CurrentDeviceStatus
 Stores the status updates from devices:
-- ID (auto-generated primary key)
 - DeviceId (serial number of the device)
 - Timestamp (when status was received)
 - Status (0=IDLE, 1=Process in progress, 2=Process completed)
 - AvailableData (number of readings buffered in the device)
-- RawPayload (the raw message content)
-- IPAddress (source IP)
-- Port (source port)
-- CheckSum (checksum from the device)
+- IP/Port information
 
 ### Device
 Stores information about registered devices:
@@ -50,66 +88,21 @@ Stores information about registered devices:
 Stores user authentication information:
 - ID (auto-generated primary key)
 - Username (unique username)
-- PasswordHash (hashed password)
+- PasswordHash (BCrypt-hashed password)
 - Role (Admin or User)
-- FullName (full name of the user)
-- Email (email address)
-- CreatedAt (when the user was created)
-- LastLogin (last login time)## Authentication and Authorization
+- FullName, Email, CreatedAt, LastLogin
 
-The application includes a role-based authentication system with two predefined roles:
-
-1. **Admin Role**
-   - Full access to all features
-   - Can view, add, edit, and delete data
-   - Username: `admin`, Password: `admin123`
-
-2. **User Role**
-   - Limited access to application features
-   - Can view and add data but cannot edit or delete
-   - Username: `user`, Password: `user123`
-
-### Security Features
-
-- Password hashing using BCrypt
-- Cookie-based authentication
-- Role-based authorization policies
-- Secure routing with authorization attributes
-- Protected views that adapt based on user role# Device Data Collector
-
-A .NET 8 web application for collecting, storing, and managing data from TCP/IP devices.
-
-## Project Overview
-
-This application serves as a central data collection point for IoT or networked devices that communicate via TCP/IP. It runs a TCP server that listens for incoming connections, stores received data in a MySQL database, and provides a web interface for viewing and managing the collected data.
-
-## Features
-
-- **TCP/IP Server**: Listens on a configurable port (default: 5000) for incoming connections
-- **Device Communication**: Send and receive messages from connected devices
-- **Data Storage**: Automatically stores incoming data in a MySQL database
-- **Web Interface**: View, create, edit, and delete stored device data
-- **Live Communication**: Test device connectivity by sending manual messages
-
-## System Architecture
-
-The application consists of:
-
-1. **Web Interface** (ASP.NET MVC)
-2. **TCP Server** (Background Service)
-3. **MySQL Database** (via Entity Framework Core)
-
-## Getting Started
+## Setting Up the Application
 
 ### Prerequisites
 
 - .NET 8.0 SDK
-- MySQL Server
-- Visual Studio 2022 or later (recommended)
+- MySQL Server 8.0 or higher
+- An IDE like Visual Studio 2022 or VS Code
 
 ### Configuration
 
-Database and TCP server settings can be configured in `appsettings.json`:
+The main configuration is in `appsettings.json`:
 
 ```json
 {
@@ -117,179 +110,160 @@ Database and TCP server settings can be configured in `appsettings.json`:
     "DefaultConnection": "server=localhost;port=3306;database=devicedata;user=root;password=root"
   },
   "TCPServer": {
-    "IPAddress": "127.0.0.2",
+    "IPAddress": "192.168.1.124",
     "Port": 5000
+  },
+  "DeviceStatusMonitor": {
+    "CheckIntervalSeconds": 5,
+    "InactiveThresholdSeconds": 10
+  },
+  "DeviceStatusCleanup": {
+    "IntervalHours": 24,
+    "RetentionDays": 30
   }
 }
 ```
 
-> **Important**: Before running the application, ensure you've configured the loopback addresses (127.0.0.2 and 127.0.0.3) as described in the "Configuring Additional Local IP Addresses" section below.
+Key settings:
+- **DefaultConnection**: Your MySQL connection string
+- **TCPServer:IPAddress**: The IP address to listen on for device connections
+- **TCPServer:Port**: The port to listen on for device connections
+- **DeviceStatusMonitor**: Configuration for device status checking
+- **DeviceStatusCleanup**: Configuration for automatic data cleanup
 
 ### Running the Application
 
 1. Clone the repository
-2. Update the database connection string in `appsettings.json`
-3. Configure the required loopback IP addresses (127.0.0.2 and 127.0.0.3) as described in the "Configuring Additional Local IP Addresses" section below
-4. Run the application:
+2. Update the MySQL connection string in `appsettings.json`
+3. Run the database migrations:
+   ```
+   dotnet ef database update
+   ```
+4. Start the application:
    ```
    dotnet run
    ```
 
 The application will:
-- Automatically create the database and tables if they don't exist
+- Initialize the database (create if it doesn't exist)
 - Apply any pending migrations
-- Start the TCP server listening on the configured IP address (127.0.0.2) and port (5000)
+- Start the TCP server for device communication
+- Launch the web interface
 
-> Note: Manual migration using `dotnet ef database update` is no longer required as the application handles this automatically at startup.
+## Authentication
 
-## Key Components
+The system includes two predefined user accounts:
 
-### Controllers
+1. **Administrator**
+   - Username: `admin`
+   - Password: `admin123`
+   - Full access to all features
 
-- **HomeController**: Main application entry point
-- **DeviceController**: Handles device communication
-- **DeviceDataController**: Manages stored device data
+2. **Regular User**
+   - Username: `user`
+   - Password: `user123`
+   - Limited access (can view but not modify data)
 
-### Services
+## Device Communication Protocol
 
-- **TCPServerService**: Background service that maintains a TCP listener and processes incoming connections
-- **TCPClientService**: Handles outgoing TCP connections to devices
+Devices communicate with the server using a text-based protocol with the following format:
 
-### Data Model
-
-- **DeviceData**: Represents a single data packet received from a device
-  - ID (auto-generated)
-  - DeviceID (string identifier)
-  - Timestamp (when data was received)
-  - DataPayload (the actual data content)
-  - IPAddress (source IP)
-  - Port (source port)
-
-## Usage
-
-### Viewing Collected Data
-
-Navigate to the "View Data" page to see all data collected from devices.
-
-### Sending Messages to Devices
-
-Use the "Send Data" page to manually send messages to devices:
-
-1. Enter the device IP address and port
-2. Type your message
-3. Click "Send Message"
-
-The system will attempt to connect to the device, send the message, and display any response.
-
-### Testing with TCP Client Tools
-
-For testing, you can use tools like:
-
-- **Hercules** (Set to 127.0.0.3 in the default configuration)
-- **NetCat**
-- **Telnet**
-
-## Development Notes
-
-- The application is configured to distinguish between messages sent from the web interface and actual device data.
-- Messages sent via the web interface are not stored in the database.
-- The server automatically adds a newline character to messages if not present.
-
-## Configuring Additional Local IP Addresses
-
-For testing purposes, you may need to set up additional loopback IP addresses (like 127.0.0.2, 127.0.0.3, etc.) on your local machine. The application requires two different loopback addresses:
-
-1. **127.0.0.2** - Used by the application's TCP server (configured in `appsettings.json`)
-2. **127.0.0.3** - Typically used for testing clients like Hercules
-
-Here's how to add these addresses:
-
-### Windows
-
-1. Open Command Prompt as Administrator
-2. Add a new loopback IP address using the following command:
-   ```
-   netsh interface ipv4 add address "Loopback Adapter" 127.0.0.3 255.0.0.0
-   ```
-   Replace "Loopback Adapter" with your loopback adapter name if different.
-   
-3. Verify the IP address was added:
-   ```
-   netsh interface ipv4 show ipaddresses
-   ```
-
-4. To make this persistent across reboots, create a batch file with the command and add it to your startup items.
-
-### Linux
-
-1. Temporarily add a loopback IP address:
-   ```
-   sudo ip addr add 127.0.0.3/8 dev lo
-   ```
-
-2. Verify it was added:
-   ```
-   ip addr show dev lo
-   ```
-
-3. To make it persistent, add to `/etc/network/interfaces`:
-   ```
-   auto lo:0
-   iface lo:0 inet static
-       address 127.0.0.3
-       netmask 255.0.0.0
-   ```
-
-### macOS
-
-1. Temporarily add a loopback IP address:
-   ```
-   sudo ifconfig lo0 alias 127.0.0.3/8
-   ```
-
-2. Verify it was added:
-   ```
-   ifconfig lo0
-   ```
-
-3. To make it persistent, create a launch daemon.
-
-## Database Management
-
-The project uses Entity Framework Core with a Code-First approach and automatically handles database creation and migration at startup.
-
-### Automatic Database Initialization
-
-The application now includes a `DatabaseInitializer` service that:
-- Creates the database if it doesn't exist
-- Applies any pending migrations automatically
-- Logs the database initialization process
-
-### Managing Migrations
-
-For development purposes, you can still manage migrations manually:
-
-```bash
-# Add a new migration after model changes
-dotnet ef migrations add MigrationName
-
-# Apply migrations manually (not required for normal operation)
-dotnet ef database update
+### Status Messages
+```
+#SªSNªStatusª"timestamp"ª"AvailableData"ª"CS"ý
 ```
 
-## Project Structure
+### Data Messages
+```
+#DªSNªtimestampªBªRefCodeªDonationIdªOperatorIdªLotNumberªMªLipemicValueªLipemicGroupªLipemicStatusªCSý
+```
 
-- **Controllers/**: MVC controllers
-- **Models/**: Data models
-- **Views/**: User interface
-- **Services/**: Background services and utilities
-- **Data/**: Database context and configuration
-- **Migrations/**: Database migration files
+Where:
+- `#S` or `#D` indicates message type (Status or Data)
+- `ª` is the field separator (Unicode 170)
+- `SN` is the device serial number
+- `B` indicates barcode mode (followed by barcode data)
+- `M` indicates measurement data (followed by lipemic test results)
+- `ý` marks the end of the message
+
+The application also supports requesting buffered data from devices using:
+```
+#uªSNª\n
+```
+
+And acknowledges received data with:
+```
+#AªSNª\n
+```
+
+## Background Services
+
+The application includes several background services:
+
+1. **TCPServerService** - Listens for incoming connections from devices
+2. **DeviceStatusMonitorService** - Monitors device status and marks devices as inactive when appropriate
+3. **DeviceStatusCleanupService** - Performs periodic cleanup of historical status data
+4. **BufferDataRetrievalService** - Retrieves buffered data from devices on demand
+
+## User Interface
+
+The web interface is organized into several main sections:
+
+1. **Home** - Overview and system status
+2. **Donations** - View and manage donation records
+3. **Devices** - Monitor and manage connected devices
+4. **User Management** (Admin only) - Add, edit, and delete user accounts
+
+## Extending the Application
+
+### Adding New Device Types
+
+To add support for new device types:
+
+1. Update the `DeviceMessageParser` class to handle new message formats
+2. Add any new fields to the `DonationsData` model if needed
+3. Create migrations to update the database schema
+
+### Adding New Features
+
+The modular design makes it easy to add new features:
+
+1. Create new controller(s) for the feature
+2. Add corresponding model(s) and views
+3. Update the navigation in `_Layout.cshtml`
+4. Add any necessary background services
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Errors**
+   - Verify your MySQL connection string
+   - Ensure MySQL is running
+   - Check user permissions
+
+2. **TCP Server Not Starting**
+   - Verify the IP address is available on your system
+   - Check if the port is already in use
+   - Look for firewall restrictions
+
+3. **Devices Not Connecting**
+   - Verify device is configured with correct server IP and port
+   - Check network connectivity between device and server
+   - Review server logs for connection attempts
+
+### Logging
+
+The application uses structured logging to help diagnose issues:
+
+- Logs are written to the console by default
+- Adjust log levels in `appsettings.json` to increase or decrease verbosity
+- For production, consider configuring a more robust logging provider
 
 ## License
 
-[Your license information]
+[Your License Information]
 
-## Contributors
+## Support
 
-[Your contributor information]
+For questions or support, please contact [Your Contact Information]
