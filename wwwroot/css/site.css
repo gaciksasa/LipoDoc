@@ -1,22 +1,729 @@
 html {
-  font-size: 14px;
+    font-size: 14px;
+    position: relative;
+    min-height: 100%;
 }
 
 @media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
+    html {
+        font-size: 16px;
+    }
 }
 
 body {
-  margin-bottom: 60px;
+    margin-bottom: 60px;
+}
+
+/* Override Bootstrap's default colors - monochromatic pink theme */
+:root {
+    /* Primary pink color and variants */
+    --bs-primary: #ab2969; /* Original pink */
+    --bs-primary-rgb: 171, 41, 105;
+    /* Secondary becomes lighter shade of primary */
+    --bs-secondary: #c95a91; /* Lighter pink */
+    --bs-secondary-rgb: 201, 90, 145;
+    /* Success becomes green-tinted pink */
+    --bs-success: #9c2d61; /* Slightly purpler pink */
+    --bs-success-rgb: 156, 45, 97;
+    /* Info becomes lighter blue-tinted pink */
+    --bs-info: #d87ba8; /* Very light pink */
+    --bs-info-rgb: 216, 123, 168;
+    /* Warning becomes orange-tinted pink */
+    --bs-warning: #bf4b81; /* Brighter pink */
+    --bs-warning-rgb: 191, 75, 129;
+    /* Danger becomes more saturated pink */
+    --bs-danger: #8e1b52; /* Darker pink */
+    --bs-danger-rgb: 142, 27, 82;
+    /* Light and dark colors */
+    --bs-light: #fdf0f6; /* Very pale pink */
+    --bs-dark: #5e1639; /* Very dark pink */
+}
+
+/* Focus states */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem rgba(171, 41, 105, 0.5); /* Pink shadow instead of blue */
+}
+
+/* Override button colors */
+.btn-primary {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.btn-secondary {
+    background-color: var(--bs-secondary);
+    border-color: var(--bs-secondary);
+}
+
+.btn-success {
+    background-color: var(--bs-success);
+    border-color: var(--bs-success);
+}
+
+.btn-danger {
+    background-color: var(--bs-danger);
+    border-color: var(--bs-danger);
+}
+
+.btn-warning {
+    background-color: var(--bs-warning);
+    border-color: var(--bs-warning);
+}
+
+.btn-info {
+    background-color: var(--bs-info);
+    border-color: var(--bs-info);
+}
+
+/* Override outlined button styles */
+.btn-outline-primary {
+    color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+    .btn-outline-primary:hover {
+        background-color: var(--bs-primary);
+        color: white;
+    }
+
+.btn-outline-secondary {
+    color: var(--bs-secondary);
+    border-color: var(--bs-secondary);
+}
+
+    .btn-outline-secondary:hover {
+        background-color: var(--bs-secondary);
+        color: white;
+    }
+
+.btn-outline-success {
+    color: var(--bs-success);
+    border-color: var(--bs-success);
+}
+
+    .btn-outline-success:hover {
+        background-color: var(--bs-success);
+        color: white;
+    }
+
+.btn-outline-danger {
+    color: var(--bs-danger);
+    border-color: var(--bs-danger);
+}
+
+    .btn-outline-danger:hover {
+        background-color: var(--bs-danger);
+        color: white;
+    }
+
+.btn-outline-warning {
+    color: var(--bs-warning);
+    border-color: var(--bs-warning);
+}
+
+    .btn-outline-warning:hover {
+        background-color: var(--bs-warning);
+        color: white;
+    }
+
+.btn-outline-info {
+    color: var(--bs-info);
+    border-color: var(--bs-info);
+}
+
+    .btn-outline-info:hover {
+        background-color: var(--bs-info);
+        color: white;
+    }
+
+/* Active states for outlined buttons */
+.btn-outline-primary:active, .btn-outline-primary.active {
+    background-color: var(--bs-primary);
+    color: white;
+}
+
+.btn-outline-secondary:active, .btn-outline-secondary.active {
+    background-color: var(--bs-secondary);
+    color: white;
+}
+
+.btn-outline-success:active, .btn-outline-success.active {
+    background-color: var(--bs-success);
+    color: white;
+}
+
+.btn-outline-danger:active, .btn-outline-danger.active {
+    background-color: var(--bs-danger);
+    color: white;
+}
+
+.btn-outline-warning:active, .btn-outline-warning.active {
+    background-color: var(--bs-warning);
+    color: white;
+}
+
+.btn-outline-info:active, .btn-outline-info.active {
+    background-color: var(--bs-info);
+    color: white;
+}
+
+/* Button hover effects */
+.btn-primary:hover {
+    background-color: #8e1b52; /* Darker pink */
+    border-color: #8e1b52;
+    box-shadow: 0 0.25rem 0.5rem rgba(171, 41, 105, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-secondary:hover {
+    background-color: #b3467b; /* Darker shade of secondary */
+    border-color: #b3467b;
+    box-shadow: 0 0.25rem 0.5rem rgba(201, 90, 145, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-success:hover {
+    background-color: #7e2150; /* Darker shade of success */
+    border-color: #7e2150;
+    box-shadow: 0 0.25rem 0.5rem rgba(156, 45, 97, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-danger:hover {
+    background-color: #701541; /* Darker shade of danger */
+    border-color: #701541;
+    box-shadow: 0 0.25rem 0.5rem rgba(142, 27, 82, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-warning:hover {
+    background-color: #a03c6a; /* Darker shade of warning */
+    border-color: #a03c6a;
+    box-shadow: 0 0.25rem 0.5rem rgba(191, 75, 129, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-info:hover {
+    background-color: #ce6294; /* Darker shade of info */
+    border-color: #ce6294;
+    box-shadow: 0 0.25rem 0.5rem rgba(216, 123, 168, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Link buttons */
+.btn-link:hover {
+    color: #8e1b52; /* Darker pink */
+    text-decoration: underline;
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Outlined buttons hover effects */
+.btn-outline-primary:hover,
+.btn-outline-secondary:hover,
+.btn-outline-success:hover,
+.btn-outline-danger:hover,
+.btn-outline-warning:hover,
+.btn-outline-info:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Transition base for all buttons */
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+    /* Active/pressed state for buttons */
+    .btn:active {
+        transform: translateY(0);
+        box-shadow: none !important;
+    }
+
+    /* Disabled state */
+    .btn:disabled {
+        opacity: 0.65;
+        box-shadow: none;
+        transform: none;
+    }
+
+/* Override background colors */
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}
+
+.bg-secondary {
+    background-color: var(--bs-secondary) !important;
+}
+
+.bg-success {
+    background-color: var(--bs-success) !important;
+}
+
+.bg-danger {
+    background-color: var(--bs-danger) !important;
+}
+
+.bg-warning {
+    background-color: var(--bs-warning) !important;
+}
+
+.bg-info {
+    background-color: var(--bs-info) !important;
+}
+
+.bg-light {
+    background-color: var(--bs-light) !important;
+}
+
+.bg-dark {
+    background-color: var(--bs-dark) !important;
+}
+
+/* Override text colors */
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+.text-secondary {
+    color: var(--bs-secondary) !important;
+}
+
+.text-success {
+    color: var(--bs-success) !important;
+}
+
+.text-danger {
+    color: var(--bs-danger) !important;
+}
+
+.text-warning {
+    color: var(--bs-warning) !important;
+}
+
+.text-info {
+    color: var(--bs-info) !important;
+}
+
+.text-light {
+    color: var(--bs-light) !important;
+}
+
+.text-dark {
+    color: var(--bs-dark) !important;
+}
+
+/* Override link color */
+a {
+    color: var(--bs-primary);
+}
+
+    a:hover {
+        color: #8e1b52; /* Darker shade of primary */
+    }
+
+/* Override the navbar */
+.navbar-light {
+    background-color: var(--bs-primary) !important;
+}
+
+    .navbar-light .navbar-brand,
+    .navbar-light .nav-link {
+        color: white !important;
+    }
+
+    .navbar-light .navbar-toggler {
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .navbar-light .navbar-toggler-icon {
+        filter: invert(1);
+    }
+
+/* Form styling */
+.form-control {
+    border-color: #ddd;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+    .form-control:focus {
+        border-color: var(--bs-primary);
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+    }
+
+/* Custom styling for form labels */
+.form-label {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+/* Form validation styling */
+.form-control.is-valid,
+.was-validated .form-control:valid {
+    border-color: var(--bs-success);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%239c2d61' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+}
+
+.form-control.is-invalid,
+.was-validated .form-control:invalid {
+    border-color: var(--bs-danger);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%238e1b52'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%238e1b52' stroke='none'/%3e%3c/svg%3e");
+}
+
+/* Validation messages */
+.valid-feedback {
+    color: var(--bs-success);
+}
+
+.invalid-feedback {
+    color: var(--bs-danger);
+}
+
+/* Form check (checkboxes and radios) */
+.form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.form-check-input:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Form switch */
+.form-switch .form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+
+/* Form select (dropdowns) */
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Input groups */
+.input-group-text {
+    background-color: #f8f9fa;
+    border-color: #ddd;
+}
+
+/* Floating labels */
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    color: var(--bs-primary);
+}
+
+/* Form range (sliders) */
+.form-range::-webkit-slider-thumb {
+    background-color: var(--bs-primary);
+}
+
+.form-range::-moz-range-thumb {
+    background-color: var(--bs-primary);
+}
+
+.form-range::-ms-thumb {
+    background-color: var(--bs-primary);
+}
+
+/* Form file input */
+.form-control[type="file"]:not(:disabled):not([readonly]) {
+    border-color: #ddd;
+}
+
+    .form-control[type="file"]:not(:disabled):not([readonly]):focus {
+        border-color: var(--bs-primary);
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+    }
+
+/* Card styling */
+.card {
+    border-radius: 0.375rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+}
+
+    .card-header:first-child {
+        border-radius: calc(0.375rem - 1px) calc(0.375rem - 1px) 0 0;
+    }
+
+.card-footer {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-top: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 0.75rem 1.25rem;
+}
+
+    .card-footer:last-child {
+        border-radius: 0 0 calc(0.375rem - 1px) calc(0.375rem - 1px);
+    }
+
+/* Card with primary header */
+.card .card-header.bg-primary {
+    color: #fff;
+}
+
+/* Card with custom border colors */
+.card.border-primary {
+    border-color: var(--bs-primary);
+}
+
+.card.border-secondary {
+    border-color: var(--bs-secondary);
+}
+
+.card.border-success {
+    border-color: var(--bs-success);
+}
+
+.card.border-danger {
+    border-color: var(--bs-danger);
+}
+
+.card.border-warning {
+    border-color: var(--bs-warning);
+}
+
+.card.border-info {
+    border-color: var(--bs-info);
+}
+
+/* Badge Styling */
+.badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+    border-radius: 0.375rem;
+    text-transform: none;
+    font-size: 0.75em;
+    line-height: 1;
+    white-space: nowrap;
+    transition: all 0.2s ease-in-out;
+}
+
+    /* Badge colors */
+    .badge.bg-primary {
+        background-color: var(--bs-primary) !important;
+        color: #fff;
+    }
+
+    .badge.bg-secondary {
+        background-color: var(--bs-secondary) !important;
+        color: #fff;
+    }
+
+    .badge.bg-success {
+        background-color: var(--bs-success) !important;
+        color: #fff;
+    }
+
+    .badge.bg-danger {
+        background-color: var(--bs-danger) !important;
+        color: #fff;
+    }
+
+    .badge.bg-warning {
+        background-color: var(--bs-warning) !important;
+        color: #fff; /* White text for better contrast in monochromatic theme */
+    }
+
+    .badge.bg-info {
+        background-color: var(--bs-info) !important;
+        color: #212529; /* Dark text for better contrast on light pink */
+    }
+
+    .badge.bg-light {
+        background-color: var(--bs-light) !important;
+        color: #212529;
+    }
+
+    .badge.bg-dark {
+        background-color: var(--bs-dark) !important;
+        color: #fff;
+    }
+
+    /* Outline badges */
+    .badge.text-bg-primary {
+        color: var(--bs-primary);
+        background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+    }
+
+    .badge.text-bg-secondary {
+        color: var(--bs-secondary);
+        background-color: rgba(var(--bs-secondary-rgb), 0.1) !important;
+    }
+
+    .badge.text-bg-success {
+        color: var(--bs-success);
+        background-color: rgba(var(--bs-success-rgb), 0.1) !important;
+    }
+
+    .badge.text-bg-danger {
+        color: var(--bs-danger);
+        background-color: rgba(var(--bs-danger-rgb), 0.1) !important;
+    }
+
+    .badge.text-bg-warning {
+        color: var(--bs-warning);
+        background-color: rgba(var(--bs-warning-rgb), 0.1) !important;
+    }
+
+    .badge.text-bg-info {
+        color: var(--bs-info);
+        background-color: rgba(var(--bs-info-rgb), 0.1) !important;
+    }
+
+    /* Badge pill variant */
+    .badge.rounded-pill {
+        border-radius: 50rem;
+        padding-right: 0.6em;
+        padding-left: 0.6em;
+    }
+
+    /* Badge hover effects */
+    .badge:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+/* Badge with links */
+a.badge {
+    text-decoration: none;
+}
+
+    a.badge:hover {
+        text-decoration: none;
+        opacity: 0.9;
+    }
+
+/* Badge positioning in different contexts */
+.btn .badge {
+    position: relative;
+    top: -1px;
+}
+
+/* Card with badge in header */
+.card-header .badge {
+    float: right;
+    margin-top: 2px;
+}
+
+/* Table styling */
+.table {
+    --bs-table-striped-bg: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.table-primary {
+    --bs-table-bg: rgba(var(--bs-primary-rgb), 0.1);
+    --bs-table-striped-bg: rgba(var(--bs-primary-rgb), 0.15);
+    --bs-table-active-bg: rgba(var(--bs-primary-rgb), 0.2);
+}
+
+/* Pagination styling */
+.page-link {
+    color: var(--bs-primary);
+}
+
+    .page-link:hover {
+        color: #8e1b52;
+        background-color: var(--bs-light);
+    }
+
+.page-item.active .page-link {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Breadcrumb styling */
+.breadcrumb-item.active {
+    color: var(--bs-primary);
+}
+
+/* Progress bar styling */
+.progress-bar {
+    background-color: var(--bs-primary);
+}
+
+/* Alerts styling */
+.alert-primary {
+    color: #5e1639;
+    background-color: #f9e1ec;
+    border-color: #f2c9de;
+}
+
+.alert-secondary {
+    color: #8a2054;
+    background-color: #faeaf2;
+    border-color: #f7d6e8;
+}
+
+.alert-success {
+    color: #7e2150;
+    background-color: #f7e3ed;
+    border-color: #eecbdd;
+}
+
+.alert-danger {
+    color: #701541;
+    background-color: #f6dbe7;
+    border-color: #edbad0;
+}
+
+.alert-warning {
+    color: #a03c6a;
+    background-color: #fae9f0;
+    border-color: #f6d3e4;
+}
+
+.alert-info {
+    color: #ce6294;
+    background-color: #fcf0f5;
+    border-color: #f9e1ed;
+}
+
+/* List group styling */
+.list-group-item.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Dropdown styling */
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--bs-primary);
+}
+
+/* Modal styling */
+.modal-header {
+    border-bottom-color: rgba(var(--bs-primary-rgb), 0.2);
+}
+
+.modal-footer {
+    border-top-color: rgba(var(--bs-primary-rgb), 0.2);
+}
+
+/* Form groups spacing */
+.mb-3 {
+    margin-bottom: 1rem !important;
 }
