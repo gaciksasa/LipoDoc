@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using DeviceDataCollector.Data;
 using Microsoft.AspNetCore.Authorization;
 using DeviceDataCollector.Models;
+using DeviceDataCollector.Controllers;
 
 namespace DeviceDataCollector.Controllers
 {
@@ -11,6 +12,7 @@ namespace DeviceDataCollector.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DonationsController> _logger;
+        private readonly int _pageSize = 20; // Default page size
 
         public DonationsController(
             ApplicationDbContext context,
@@ -21,21 +23,91 @@ namespace DeviceDataCollector.Controllers
         }
 
         // GET: Donations
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string sortOrder, string currentFilter, string searchString, int? pageNumber)
         {
-            var donations = await _context.DonationsData
-                .OrderByDescending(d => d.Timestamp)
-                .Take(50) // Limit to most recent 50 records for performance
-                .ToListAsync();
+            ViewBag.CurrentSort = sortOrder;
+            ViewBag.TimestampSortParm = String.IsNullOrEmpty(sortOrder) ? "timestamp_desc" : "";
+            ViewBag.DeviceSortParm = sortOrder == "device" ? "device_desc" : "device";
+            ViewBag.DonationIdSortParm = sortOrder == "donation_id" ? "donation_id_desc" : "donation_id";
+            ViewBag.LipemicValueSortParm = sortOrder == "lipemic_value" ? "lipemic_value_desc" : "lipemic_value";
+            ViewBag.LipemicGroupSortParm = sortOrder == "lipemic_group" ? "lipemic_group_desc" : "lipemic_group";
 
-            // Check if it's an AJAX request
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            if (searchString != null)
             {
-                // Return the partial view for AJAX refresh
-                return PartialView("_DonationList", donations);
+                pageNumber = 1;
+            }
+            else
+            {
+                searchString = currentFilter;
             }
 
-            return View(donations);
+            ViewBag.CurrentFilter = searchString;
+
+            var query = _context.DonationsData.AsQueryable();
+
+            // Apply search filter if provided
+            if (!String.IsNullOrEmpty(searchString))
+            {
+                query = query.Where(d =>
+                    (d.DonationIdBarcode != null && d.DonationIdBarcode.Contains(searchString)) ||
+                    (d.DeviceId != null && d.DeviceId.Contains(searchString)) ||
+                    (d.OperatorIdBarcode != null && d.OperatorIdBarcode.Contains(searchString)) ||
+                    (d.RefCode != null && d.RefCode.Contains(searchString))
+                );
+            }
+
+            // Apply sorting
+            switch (sortOrder)
+            {
+                case "timestamp_desc":
+                    query = query.OrderByDescending(d => d.Timestamp);
+                    break;
+                case "device":
+                    query = query.OrderBy(d => d.DeviceId);
+                    break;
+                case "device_desc":
+                    query = query.OrderByDescending(d => d.DeviceId);
+                    break;
+                case "donation_id":
+                    query = query.OrderBy(d => d.DonationIdBarcode);
+                    break;
+                case "donation_id_desc":
+                    query = query.OrderByDescending(d => d.DonationIdBarcode);
+                    break;
+                case "lipemic_value":
+                    query = query.OrderBy(d => d.LipemicValue);
+                    break;
+                case "lipemic_value_desc":
+                    query = query.OrderByDescending(d => d.LipemicValue);
+                    break;
+                case "lipemic_group":
+                    query = query.OrderBy(d => d.LipemicGroup);
+                    break;
+                case "lipemic_group_desc":
+                    query = query.OrderByDescending(d => d.LipemicGroup);
+                    break;
+                default:
+                    query = query.OrderByDescending(d => d.Timestamp); // Default sort is newest first
+                    break;
+            }
+
+            // Check if it's an AJAX request for auto-refresh
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                // For AJAX requests, just return the first page of data
+                var firstPageData = await query
+                    .Take(_pageSize)
+                    .ToListAsync();
+
+                // Return the partial view for AJAX refresh
+                return PartialView("_DonationList", firstPageData);
+            }
+
+            // For normal page loads, return paginated data
+            var pageIndex = pageNumber ?? 1;
+            var paginatedList = await PaginatedList<DonationsData>.CreateAsync(query, pageIndex, _pageSize);
+
+            return View(paginatedList);
         }
 
         // GET: Donations/Details/5
