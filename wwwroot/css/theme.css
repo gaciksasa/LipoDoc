@@ -1,0 +1,497 @@
+﻿/* Theme-specific styles */
+
+/* Base theme colors - monochromatic pink theme */
+:root {
+    /* Primary pink color and variants */
+    --bs-primary: #ab2969; /* Original pink */
+    --bs-primary-rgb: 171, 41, 105;
+    /* Secondary becomes lighter shade of primary */
+    --bs-secondary: #c95a91; /* Lighter pink */
+    --bs-secondary-rgb: 201, 90, 145;
+    /* Success becomes green-tinted pink */
+    --bs-success: #9c2d61; /* Slightly purpler pink */
+    --bs-success-rgb: 156, 45, 97;
+    /* Info becomes lighter blue-tinted pink */
+    --bs-info: #d87ba8; /* Very light pink */
+    --bs-info-rgb: 216, 123, 168;
+    /* Warning becomes orange-tinted pink */
+    --bs-warning: #bf4b81; /* Brighter pink */
+    --bs-warning-rgb: 191, 75, 129;
+    /* Danger becomes more saturated pink */
+    --bs-danger: #8e1b52; /* Darker pink */
+    --bs-danger-rgb: 142, 27, 82;
+}
+
+/* Light theme (default) */
+:root,
+[data-bs-theme="light"] {
+    --bs-body-bg: #fff;
+    --bs-body-color: #212529;
+    --bs-border-color: #dee2e6;
+    --card-bg: #fff;
+    --card-border: rgba(0, 0, 0, 0.125);
+    --nav-bg: var(--bs-primary);
+    --nav-text: #fff;
+    --footer-bg: #f8f9fa;
+    --pre-bg: #f8f9fa;
+    --input-bg: #fff;
+    --chart-grid: rgba(0, 0, 0, 0.1);
+    --chart-text: #666;
+    /* Light specific colors */
+    --bs-light: #fdf0f6; /* Very pale pink */
+    --bs-dark: #5e1639; /* Very dark pink */
+}
+
+/* Dark theme */
+[data-bs-theme="dark"] {
+    --bs-body-bg: #1a1a1a;
+    --bs-body-color: #f8f9fa;
+    --bs-border-color: #444;
+    --card-bg: #2a2a2a;
+    --card-border: rgba(255, 255, 255, 0.125);
+    --nav-bg: #8e1b52; /* Darker pink for navbar in dark mode */
+    --nav-text: #fff;
+    --footer-bg: #2a2a2a;
+    --pre-bg: #333;
+    --input-bg: #333;
+    --chart-grid: rgba(255, 255, 255, 0.1);
+    --chart-text: #adb5bd;
+    /* Dark theme variations of theme colors */
+    --bs-primary: #c44a80; /* Brighter pink for dark mode */
+    --bs-primary-rgb: 196, 74, 128;
+    --bs-secondary: #d87ba8; /* Lighter pink for dark mode */
+    --bs-secondary-rgb: 216, 123, 168;
+    --bs-success: #b54678; /* Slightly brighter success for dark mode */
+    --bs-success-rgb: 181, 70, 120;
+    --bs-info: #e699be; /* Lighter info for dark mode */
+    --bs-info-rgb: 230, 153, 190;
+    --bs-warning: #cf5f92; /* Brighter warning for dark mode */
+    --bs-warning-rgb: 207, 95, 146;
+    --bs-danger: #a42961; /* Slightly brighter danger for dark mode */
+    --bs-danger-rgb: 164, 41, 97;
+    --bs-light: #444; /* Darker light for dark mode */
+    --bs-dark: #fdf0f6; /* Very pale pink becomes dark in dark mode */
+}
+
+/* Apply theme colors to main elements */
+body {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    margin-bottom: 60px;
+}
+
+.navbar {
+    background-color: var(--nav-bg) !important;
+    border-color: var(--bs-border-color) !important;
+    transition: background-color 0.3s ease;
+}
+
+.navbar-light .navbar-brand,
+.navbar-light .nav-link {
+    color: var(--nav-text) !important;
+}
+
+.navbar-light .navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-light .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+    transition: background-color 0.3s ease;
+    border-radius: 0.375rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+.card-header, .card-footer {
+    transition: background-color 0.3s ease;
+}
+
+[data-bs-theme="light"] .card-header,
+[data-bs-theme="light"] .card-footer {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+[data-bs-theme="dark"] .card-header,
+[data-bs-theme="dark"] .card-footer {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.footer {
+    background-color: var(--footer-bg);
+    border-color: var(--bs-border-color);
+    transition: background-color 0.3s ease;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    white-space: nowrap;
+    line-height: 60px;
+}
+
+/* Table styling */
+.table {
+    color: var(--bs-body-color);
+    --bs-table-striped-bg: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    color: var(--bs-body-color);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background-color: rgba(255, 255, 255, 0.075);
+    color: var(--bs-body-color) !important; /* Ensure text remains visible on hover */
+}
+
+.table-primary {
+    --bs-table-bg: rgba(var(--bs-primary-rgb), 0.1);
+    --bs-table-striped-bg: rgba(var(--bs-primary-rgb), 0.15);
+    --bs-table-active-bg: rgba(var(--bs-primary-rgb), 0.2);
+}
+
+/* Form element styling */
+.form-control,
+.form-select {
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    border-color: #ddd;
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: var(--input-bg);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Form styling */
+.form-label {
+    font-weight: 500;
+    color: var(--bs-body-color);
+    margin-bottom: 0.5rem;
+}
+
+/* Form check (checkboxes and radios) */
+.form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.form-check-input:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Form switch */
+.form-switch .form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Pre and code blocks */
+[data-bs-theme="dark"] pre,
+[data-bs-theme="dark"] code {
+    background-color: var(--pre-bg);
+    color: #e9ecef;
+}
+
+/* Theme toggle button styling */
+.theme-toggle {
+    cursor: pointer;
+    padding: 0.25rem 0.75rem;
+    font-size: 1.25rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .theme-toggle:hover {
+        opacity: 0.8;
+    }
+
+/* Button styling */
+.btn-primary {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.btn-secondary {
+    background-color: var(--bs-secondary);
+    border-color: var(--bs-secondary);
+}
+
+.btn-success {
+    background-color: var(--bs-success);
+    border-color: var(--bs-success);
+}
+
+.btn-danger {
+    background-color: var(--bs-danger);
+    border-color: var(--bs-danger);
+}
+
+.btn-warning {
+    background-color: var(--bs-warning);
+    border-color: var(--bs-warning);
+}
+
+.btn-info {
+    background-color: var(--bs-info);
+    border-color: var(--bs-info);
+}
+
+/* Button hover effects */
+.btn-primary:hover {
+    background-color: #8e1b52; /* Darker pink */
+    border-color: #8e1b52;
+    box-shadow: 0 0.25rem 0.5rem rgba(171, 41, 105, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-secondary:hover {
+    background-color: #b3467b; /* Darker shade of secondary */
+    border-color: #b3467b;
+    box-shadow: 0 0.25rem 0.5rem rgba(201, 90, 145, 0.3);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem rgba(171, 41, 105, 0.5); /* Pink shadow instead of blue */
+}
+
+/* Badge Styling */
+.badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+    border-radius: 0.375rem;
+    text-transform: none;
+    font-size: 0.75em;
+    line-height: 1;
+    white-space: nowrap;
+    transition: all 0.2s ease-in-out;
+}
+
+    /* Badge colors */
+    .badge.bg-primary {
+        background-color: var(--bs-primary) !important;
+        color: #fff;
+    }
+
+    .badge.bg-secondary {
+        background-color: var(--bs-secondary) !important;
+        color: #fff;
+    }
+
+    .badge.bg-success {
+        background-color: var(--bs-success) !important;
+        color: #fff;
+    }
+
+    .badge.bg-danger {
+        background-color: var(--bs-danger) !important;
+        color: #fff;
+    }
+
+    .badge.bg-warning {
+        background-color: var(--bs-warning) !important;
+        color: #fff; /* White text for better contrast in monochromatic theme */
+    }
+
+    .badge.bg-info {
+        background-color: var(--bs-info) !important;
+        color: #212529; /* Dark text for better contrast on light pink */
+    }
+
+/* Smooth transitions for theme changes */
+.theme-transition {
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Modal styling */
+[data-bs-theme="dark"] .modal-content {
+    background-color: var(--card-bg);
+    border-color: var(--bs-border-color);
+}
+
+/* Alert styling */
+[data-bs-theme="light"] .alert-info {
+    color: #5e1639;
+    background-color: #f9e1ec;
+    border-color: #f2c9de;
+}
+
+[data-bs-theme="light"] .alert-success {
+    color: #7e2150;
+    background-color: #f7e3ed;
+    border-color: #eecbdd;
+}
+
+[data-bs-theme="light"] .alert-warning {
+    color: #a03c6a;
+    background-color: #fae9f0;
+    border-color: #f6d3e4;
+}
+
+[data-bs-theme="light"] .alert-danger {
+    color: #701541;
+    background-color: #f6dbe7;
+    border-color: #edbad0;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    background-color: rgba(216, 123, 168, 0.15);
+    border-color: rgba(216, 123, 168, 0.4);
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .alert-success {
+    background-color: rgba(156, 45, 97, 0.15);
+    border-color: rgba(156, 45, 97, 0.4);
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: rgba(191, 75, 129, 0.15);
+    border-color: rgba(191, 75, 129, 0.4);
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: rgba(142, 27, 82, 0.15);
+    border-color: rgba(142, 27, 82, 0.4);
+    color: var(--bs-body-color);
+}
+
+/* Override background colors */
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}
+
+.bg-secondary {
+    background-color: var(--bs-secondary) !important;
+}
+
+.bg-success {
+    background-color: var(--bs-success) !important;
+}
+
+.bg-danger {
+    background-color: var(--bs-danger) !important;
+}
+
+.bg-warning {
+    background-color: var(--bs-warning) !important;
+}
+
+.bg-info {
+    background-color: var(--bs-info) !important;
+}
+
+.bg-light {
+    background-color: var(--bs-light) !important;
+}
+
+.bg-dark {
+    background-color: var(--bs-dark) !important;
+}
+
+/* Override text colors */
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+[data-bs-theme="dark"] .text-dark {
+    color: #f8f9fa !important;
+}
+
+/* Pagination styling */
+.page-link {
+    color: var(--bs-primary);
+}
+
+    .page-link:hover {
+        color: #8e1b52;
+        background-color: var(--bs-light);
+    }
+
+.page-item.active .page-link {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Override link color */
+a {
+    color: var(--bs-primary);
+}
+
+    a:hover {
+        color: #8e1b52; /* Darker shade of primary */
+    }
+
+/* Dropdown styling */
+[data-bs-theme="dark"] .dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .dropdown-item {
+    color: var(--bs-body-color);
+}
+
+    [data-bs-theme="dark"] .dropdown-item:hover,
+    [data-bs-theme="dark"] .dropdown-item:focus {
+        background-color: rgba(255, 255, 255, 0.075);
+    }
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--bs-primary);
+}
+
+/* Table Head colors */
+thead {
+    background-color: var(--bs-primary);
+    color: white;
+}
+
+[data-bs-theme="dark"] .table thead th {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Breadcrumb styling */
+.breadcrumb-item.active {
+    color: var(--bs-primary);
+}
+
+/* Preserve light/dark toggling while maintaining pink theme */
+html {
+    font-size: 14px;
+    position: relative;
+    min-height: 100%;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
+}
