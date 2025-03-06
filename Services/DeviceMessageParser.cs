@@ -30,6 +30,9 @@ namespace DeviceDataCollector.Services
         {
             try
             {
+                // First, log the raw message before any processing
+                _logger.LogInformation($"Processing raw message: {message}");
+
                 // Normalize separators - add any separator character you want to support
                 message = message.Replace("|", "ª").Replace("?", "ª").Replace("*", "ª");
 
@@ -37,25 +40,46 @@ namespace DeviceDataCollector.Services
                 message = CleanMessage(message);
 
                 if (string.IsNullOrWhiteSpace(message))
+                {
+                    _logger.LogWarning("Empty message after cleaning");
                     return null;
+                }
 
                 var messageType = DetermineMessageType(message);
+                _logger.LogInformation($"Detected message type: {messageType}");
 
                 switch (messageType)
                 {
                     case MessageType.StatusMessage:
-                        return ParseStatusMessage(message, ipAddress, port);
+                        _logger.LogInformation($"Status message received: {message}");
+                        var statusResult = ParseStatusMessage(message, ipAddress, port);
+                        if (statusResult != null)
+                        {
+                            _logger.LogInformation($"Parsed status: DeviceId={statusResult.DeviceId}, Status={statusResult.Status}, AvailableData={statusResult.AvailableData}, Timestamp={statusResult.Timestamp}");
+                        }
+                        return statusResult;
+
                     case MessageType.DataMessage:
-                        return ParseDataMessage(message, ipAddress, port);
+                        _logger.LogInformation($"Data message received: {message}");
+                        var dataResult = ParseDataMessage(message, ipAddress, port);
+                        if (dataResult != null)
+                        {
+                            _logger.LogInformation($"Parsed data: DeviceId={dataResult.DeviceId}, DonationId={dataResult.DonationIdBarcode ?? "none"}, LipemicValue={dataResult.LipemicValue?.ToString() ?? "none"}");
+                        }
+                        return dataResult;
+
                     case MessageType.RequestMessage:
                         _logger.LogInformation($"Request message received: {message}");
                         return null; // We don't store request messages
+
                     case MessageType.AcknowledgeMessage:
                         _logger.LogInformation($"Acknowledge message received: {message}");
                         return null; // We don't store acknowledge messages
+
                     case MessageType.NoMoreDataMessage:
                         _logger.LogInformation($"No more data message received: {message}");
                         return null; // We don't store these messages
+
                     default:
                         _logger.LogWarning($"Unknown message format received: {message}");
                         return null;
@@ -99,25 +123,35 @@ namespace DeviceDataCollector.Services
             // Format: #SªSNªStatusª"vreme.timevreme.date"ª"AvailableData"ª"CS"ý
             var parts = message.Split('ª');
 
+            _logger.LogDebug($"Status message parts count: {parts.Length}, parts: {string.Join(", ", parts)}");
+
             if (parts.Length < 5)
             {
-                _logger.LogWarning($"Invalid status message format: {message}");
+                _logger.LogWarning($"Invalid status message format (not enough parts): {message}");
                 return null;
             }
 
-            var deviceStatus = new DeviceStatus
+            try
             {
-                DeviceId = parts[1],
-                Status = int.TryParse(parts[2], out int status) ? status : 0,
-                Timestamp = ParseTimestamp(parts[3]),
-                AvailableData = int.TryParse(parts[4], out int availableData) ? availableData : 0,
-                CheckSum = parts.Length > 5 ? parts[5].TrimEnd('ý') : null,
-                RawPayload = message,
-                IPAddress = ipAddress,
-                Port = port
-            };
+                var deviceStatus = new DeviceStatus
+                {
+                    DeviceId = parts[1],
+                    Status = int.TryParse(parts[2], out int status) ? status : 0,
+                    Timestamp = ParseTimestamp(parts[3]),
+                    AvailableData = int.TryParse(parts[4], out int availableData) ? availableData : 0,
+                    CheckSum = parts.Length > 5 ? parts[5].TrimEnd('ý') : null,
+                    RawPayload = message,
+                    IPAddress = ipAddress,
+                    Port = port
+                };
 
-            return deviceStatus;
+                return deviceStatus;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error parsing status message parts: {message}");
+                return null;
+            }
         }
 
         private DonationsData ParseDataMessage(string message, string ipAddress, int port)
@@ -125,66 +159,76 @@ namespace DeviceDataCollector.Services
             // Format depends on the barcode mode, but all start with: #DªSNªvreme.timevreme.dateª
             var parts = message.Split('ª');
 
+            _logger.LogDebug($"Data message parts count: {parts.Length}, parts: {string.Join(", ", parts)}");
+
             if (parts.Length < 5)
             {
-                _logger.LogWarning($"Invalid data message format: {message}");
+                _logger.LogWarning($"Invalid data message format (not enough parts): {message}");
                 return null;
             }
 
-            var donationData = new DonationsData
+            try
             {
-                DeviceId = parts[1],
-                Timestamp = ParseTimestamp(parts[2]),
-                MessageType = "#D",
-                RawPayload = message,
-                IPAddress = ipAddress,
-                Port = port
-            };
+                var donationData = new DonationsData
+                {
+                    DeviceId = parts[1],
+                    Timestamp = ParseTimestamp(parts[2]),
+                    MessageType = "#D",
+                    RawPayload = message,
+                    IPAddress = ipAddress,
+                    Port = port
+                };
 
-            // Check if barcode mode is enabled
-            int startIndex = 3;
-            if (parts[startIndex] == "B")
-            {
-                donationData.IsBarcodeMode = true;
-                startIndex++; // Skip the B marker
+                // Check if barcode mode is enabled
+                int startIndex = 3;
+                if (parts[startIndex] == "B")
+                {
+                    donationData.IsBarcodeMode = true;
+                    startIndex++; // Skip the B marker
 
-                // Extract barcode data based on position and availability
-                if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    donationData.RefCode = parts[startIndex];
-                startIndex++;
+                    // Extract barcode data based on position and availability
+                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
+                        donationData.RefCode = parts[startIndex];
+                    startIndex++;
 
-                if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    donationData.DonationIdBarcode = parts[startIndex];
-                startIndex++;
+                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
+                        donationData.DonationIdBarcode = parts[startIndex];
+                    startIndex++;
 
-                if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    donationData.OperatorIdBarcode = parts[startIndex];
-                startIndex++;
+                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
+                        donationData.OperatorIdBarcode = parts[startIndex];
+                    startIndex++;
 
-                if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                    donationData.LotNumber = parts[startIndex];
-                startIndex++;
+                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
+                        donationData.LotNumber = parts[startIndex];
+                    startIndex++;
+                }
+
+                // Find the "M" marker which indicates start of measurement data
+                int measurementIndex = Array.IndexOf(parts, "M", startIndex);
+                if (measurementIndex >= 0)
+                {
+                    if (measurementIndex + 1 < parts.Length && int.TryParse(parts[measurementIndex + 1], out int lipemicValue))
+                        donationData.LipemicValue = lipemicValue;
+
+                    if (measurementIndex + 2 < parts.Length)
+                        donationData.LipemicGroup = parts[measurementIndex + 2];
+
+                    if (measurementIndex + 3 < parts.Length)
+                        donationData.LipemicStatus = parts[measurementIndex + 3];
+                }
+
+                // Extract checksum - it's the last part before the delimiter ý
+                var lastPart = parts[parts.Length - 1];
+                donationData.CheckSum = lastPart.TrimEnd('ý');
+
+                return donationData;
             }
-
-            // Find the "M" marker which indicates start of measurement data
-            int measurementIndex = Array.IndexOf(parts, "M", startIndex);
-            if (measurementIndex >= 0)
+            catch (Exception ex)
             {
-                if (measurementIndex + 1 < parts.Length && int.TryParse(parts[measurementIndex + 1], out int lipemicValue))
-                    donationData.LipemicValue = lipemicValue;
-
-                if (measurementIndex + 2 < parts.Length)
-                    donationData.LipemicGroup = parts[measurementIndex + 2];
-
-                if (measurementIndex + 3 < parts.Length)
-                    donationData.LipemicStatus = parts[measurementIndex + 3];
+                _logger.LogError(ex, $"Error parsing data message parts: {message}");
+                return null;
             }
-
-            // Extract checksum - it's the last part before the delimiter ý
-            var lastPart = parts[parts.Length - 1];
-            donationData.CheckSum = lastPart.TrimEnd('ý');
-
-            return donationData;
         }
 
         private DateTime ParseTimestamp(string timestamp)
@@ -193,6 +237,8 @@ namespace DeviceDataCollector.Services
             {
                 if (string.IsNullOrEmpty(timestamp))
                     return DateTime.Now; // Return local time instead of UTC
+
+                _logger.LogDebug($"Parsing timestamp: {timestamp}");
 
                 // Format: "HH:mm:ssdd:MM:yyyy" or similar
                 // Need to handle possible formats

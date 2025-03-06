@@ -25,8 +25,11 @@ namespace DeviceDataCollector.Services
 
         // Define the separator characters consistently across the service
         private const char SEPARATOR = '\u00AA'; // Unicode 170 - this is the special separator character
-        private const char QUESTION_SEPARATOR = '\u003F'; // Unicode 63 - Question mark separator
+        private const char QUESTION_SEPARATOR = '\u003F'; // Unicode 63 - Question mark separator (?)
+        private const char PIPE_SEPARATOR = '\u007C'; // Unicode 124 - Pipe separator (|)
+        private const char STAR_SEPARATOR = '\u002A'; // Unicode 42 - Star separator (*)
         private const char LINE_FEED = '\u000A'; // Unicode 10 - Line Feed character
+
 
         public TCPServerService(
             ILogger<TCPServerService> logger,
@@ -43,7 +46,7 @@ namespace DeviceDataCollector.Services
             _appIpAddresses = new HashSet<string> {
                 "127.0.0.1",
                 "127.0.0.2",
-                // "192.168.1.124",
+                "192.168.1.124",
                 "::1",
                 "localhost"
             };
@@ -130,6 +133,16 @@ namespace DeviceDataCollector.Services
                     string data = Encoding.ASCII.GetString(buffer, 0, bytesRead);
                     _logger.LogInformation($"Received from {clientIP}:{clientPort}: {data}");
 
+                    // Detect message type
+                    string messageType = "Unknown";
+                    if (data.StartsWith("#S")) messageType = "Status";
+                    else if (data.StartsWith("#D")) messageType = "Data";
+                    else if (data.StartsWith("#u")) messageType = "Request";
+                    else if (data.StartsWith("#A")) messageType = "Acknowledge";
+                    else if (data.StartsWith("#U")) messageType = "NoMoreData";
+
+                    _logger.LogInformation($"Message type from {clientIP}:{clientPort}: {messageType}");
+
                     // Generate a unique hash for this message to prevent duplicates
                     string messageHash = ComputeMessageHash(data, clientIP, clientPort);
                     bool isNewMessage = false;
@@ -148,13 +161,33 @@ namespace DeviceDataCollector.Services
                         // Process and store the data
                         await ProcessDeviceMessageAsync(data, clientIP, clientPort);
 
-                        // Send simple acknowledgment
-                        await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
+                        // Only send acknowledgment for Data messages
+                        if (messageType == "Data")
+                        {
+                            await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
+                            _logger.LogInformation($"Sent acknowledgment for Data message from {clientIP}:{clientPort}");
+                        }
+                        else if (messageType == "NoMoreData")
+                        {
+                            // For #U messages, we don't send any response
+                            _logger.LogInformation($"No response needed for NoMoreData message from {clientIP}:{clientPort}");
+                        }
+                        else if (messageType == "Status")
+                        {
+                            // For #S messages, we process but don't send a response
+                            _logger.LogInformation($"Received Status message from {clientIP}:{clientPort}. No response needed.");
+                        }
                     }
                     else
                     {
-                        // Still send acknowledgment so device doesn't retry
-                        await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
+                        _logger.LogInformation($"Skipping already processed message from {clientIP}:{clientPort}");
+
+                        // Only send acknowledgment for Data messages, even for duplicates
+                        if (messageType == "Data")
+                        {
+                            await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
+                            _logger.LogInformation($"Sent acknowledgment for duplicate Data message from {clientIP}:{clientPort}");
+                        }
                     }
                 }
             }
@@ -290,7 +323,7 @@ namespace DeviceDataCollector.Services
                             currentStatus.CheckSum = status.CheckSum;
                             currentStatus.StatusUpdateCount++; // Increment the update counter
 
-                            _logger.LogDebug($"Updated current status for device {status.DeviceId} (update #{currentStatus.StatusUpdateCount})");
+                            _logger.LogDebug($"Updated current status for device {status.DeviceId}");
                         }
 
                         await dbContext.SaveChangesAsync();
@@ -355,7 +388,7 @@ namespace DeviceDataCollector.Services
 
                     dbContext.Devices.Add(device);
                     await dbContext.SaveChangesAsync();
-                    _logger.LogInformation($"✅ SUCCESS: New device registered: {deviceId}");
+                    _logger.LogInformation($"SUCCESS: New device registered: {deviceId}");
                 }
                 else
                 {
@@ -367,17 +400,17 @@ namespace DeviceDataCollector.Services
 
                     if (wasInactive)
                     {
-                        _logger.LogInformation($"✅ SUCCESS: Device {deviceId} marked as ACTIVE after receiving status message");
+                        _logger.LogInformation($"SUCCESS: Device {deviceId} marked as ACTIVE after receiving status message");
                     }
                     else
                     {
-                        _logger.LogInformation($"✅ SUCCESS: Updated device {deviceId} last connection time");
+                        _logger.LogInformation($"SUCCESS: Updated device {deviceId} last connection time");
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"❌ ERROR: Unexpected error registering/updating device {deviceId}: {ex.Message}");
+                _logger.LogError(ex, $"ERROR: Unexpected error registering/updating device {deviceId}: {ex.Message}");
             }
         }
 
@@ -388,11 +421,16 @@ namespace DeviceDataCollector.Services
                 byte[] responseData = null;
                 string deviceId = string.Empty;
 
-                // Extract device ID from the message
-                if (receivedMessage.Contains(SEPARATOR) || receivedMessage.Contains(QUESTION_SEPARATOR))
+                // Extract device ID from the message, checking various separators
+                char detectedSeparator = '\0';
+                if (receivedMessage.Contains(SEPARATOR)) detectedSeparator = SEPARATOR;
+                else if (receivedMessage.Contains(QUESTION_SEPARATOR)) detectedSeparator = QUESTION_SEPARATOR;
+                else if (receivedMessage.Contains(PIPE_SEPARATOR)) detectedSeparator = PIPE_SEPARATOR;
+                else if (receivedMessage.Contains(STAR_SEPARATOR)) detectedSeparator = STAR_SEPARATOR;
+
+                if (detectedSeparator != '\0')
                 {
-                    char separator = receivedMessage.Contains(SEPARATOR) ? SEPARATOR : QUESTION_SEPARATOR;
-                    var parts = receivedMessage.Split(separator);
+                    var parts = receivedMessage.Split(detectedSeparator);
                     if (parts.Length > 1)
                     {
                         deviceId = parts[1];
@@ -402,6 +440,8 @@ namespace DeviceDataCollector.Services
                 // Create a generic acknowledgment message in hex format if we have a device ID
                 if (!string.IsNullOrEmpty(deviceId))
                 {
+                    _logger.LogInformation($"Sending acknowledgment to device ID: {deviceId}");
+
                     using (var ms = new MemoryStream())
                     {
                         // #A prefix (0x23 0x41)
@@ -428,8 +468,18 @@ namespace DeviceDataCollector.Services
                     if (responseData != null && responseData.Length > 0)
                     {
                         await client.GetStream().WriteAsync(responseData, 0, responseData.Length, stoppingToken);
-                        _logger.LogInformation($"Sent acknowledgment to {deviceId}: {BitConverter.ToString(responseData)}");
+
+                        // Log in the requested format with special characters clearly identified
+                        _logger.LogInformation($"Sent acknowledgment to {deviceId}: #AªLD{deviceId}ª<LF>");
+
+                        // Also log the byte representation for debugging if needed
+                        string hexResponse = BitConverter.ToString(responseData);
+                        _logger.LogDebug($"Raw bytes: {hexResponse}");
                     }
+                }
+                else
+                {
+                    _logger.LogWarning($"Could not extract device ID from message: {receivedMessage}");
                 }
             }
             catch (Exception ex)
