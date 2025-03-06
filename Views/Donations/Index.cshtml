@@ -58,13 +58,14 @@
         </div>
     </div>
 
-    <div id="donationListContainer">
-        <!-- Main table -->
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Donations List</h5>
-            </div>
-            <div class="card-body p-0">
+    <!-- Main table card -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Donations List</h5>
+        </div>
+        <div class="card-body p-0">
+            <!-- Table container that will be refreshed by AJAX -->
+            <div id="donationListContainer">
                 <div class="table-responsive">
                     <table class="table table-striped table-hover mb-0">
                         <thead class="table-light">
@@ -139,7 +140,7 @@
                                         {
                                             @if (item.LipemicStatus == "PASSED")
                                             {
-                                                <span class="badge bg-success">PASSED</span>
+                                                <span class="badge bg-info">PASSED</span>
                                             }
                                             else
                                             {
@@ -177,80 +178,80 @@
                     </table>
                 </div>
             </div>
+        </div>
 
-            <!-- Pagination -->
-            <div class="card-footer">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span>Page @Model.PageIndex of @Model.TotalPages</span>
-                    </div>
-                    <div>
-                        <nav aria-label="Page navigation">
-                            <ul class="pagination mb-0">
-                                @if (Model.HasPreviousPage)
-                                {
-                                    <li class="page-item">
-                                        <a asp-action="Index"
-                                           asp-route-sortOrder="@ViewBag.CurrentSort"
-                                           asp-route-pageNumber="@(Model.PageIndex - 1)"
-                                           asp-route-currentFilter="@ViewBag.CurrentFilter"
-                                           class="page-link">
-                                            Previous
-                                        </a>
-                                    </li>
-                                }
-                                else
-                                {
-                                    <li class="page-item disabled">
-                                        <span class="page-link">Previous</span>
-                                    </li>
-                                }
+        <!-- Pagination - outside of the refresh container -->
+        <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span>Page @Model.PageIndex of @Model.TotalPages</span>
+                </div>
+                <div>
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination mb-0">
+                            @if (Model.HasPreviousPage)
+                            {
+                                <li class="page-item">
+                                    <a asp-action="Index"
+                                       asp-route-sortOrder="@ViewBag.CurrentSort"
+                                       asp-route-pageNumber="@(Model.PageIndex - 1)"
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       class="page-link">
+                                        Previous
+                                    </a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="page-item disabled">
+                                    <span class="page-link">Previous</span>
+                                </li>
+                            }
 
-                                @for (int i = Math.Max(1, Model.PageIndex - 2); i <= Math.Min(Model.TotalPages, Model.PageIndex + 2); i++)
-                                {
-                                    <li class="page-item @(i == Model.PageIndex ? "active" : "")">
-                                        <a asp-action="Index"
-                                           asp-route-sortOrder="@ViewBag.CurrentSort"
-                                           asp-route-pageNumber="@i"
-                                           asp-route-currentFilter="@ViewBag.CurrentFilter"
-                                           class="page-link">
-                                            @i
-                                        </a>
-                                    </li>
-                                }
+                            @for (int i = Math.Max(1, Model.PageIndex - 2); i <= Math.Min(Model.TotalPages, Model.PageIndex + 2); i++)
+                            {
+                                <li class="page-item @(i == Model.PageIndex ? "active" : "")">
+                                    <a asp-action="Index"
+                                       asp-route-sortOrder="@ViewBag.CurrentSort"
+                                       asp-route-pageNumber="@i"
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       class="page-link">
+                                        @i
+                                    </a>
+                                </li>
+                            }
 
-                                @if (Model.HasNextPage)
-                                {
-                                    <li class="page-item">
-                                        <a asp-action="Index"
-                                           asp-route-sortOrder="@ViewBag.CurrentSort"
-                                           asp-route-pageNumber="@(Model.PageIndex + 1)"
-                                           asp-route-currentFilter="@ViewBag.CurrentFilter"
-                                           class="page-link">
-                                            Next
-                                        </a>
-                                    </li>
-                                }
-                                else
-                                {
-                                    <li class="page-item disabled">
-                                        <span class="page-link">Next</span>
-                                    </li>
-                                }
-                            </ul>
-                        </nav>
-                    </div>
+                            @if (Model.HasNextPage)
+                            {
+                                <li class="page-item">
+                                    <a asp-action="Index"
+                                       asp-route-sortOrder="@ViewBag.CurrentSort"
+                                       asp-route-pageNumber="@(Model.PageIndex + 1)"
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       class="page-link">
+                                        Next
+                                    </a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="page-item disabled">
+                                    <span class="page-link">Next</span>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
                 </div>
             </div>
         </div>
-
-        @if (!Model.Any())
-        {
-            <div class="alert alert-info">
-                No donation data available. Connect devices to begin collecting data.
-            </div>
-        }
     </div>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            No donation data available. Connect devices to begin collecting data.
+        </div>
+    }
 </div>
 
 @section Scripts {
@@ -268,11 +269,16 @@
                 $.ajax({
                     url: '@Url.Action("Index", "Donations")',
                     type: 'GET',
+                    data: {
+                        sortOrder: '@ViewBag.CurrentSort',
+                        currentFilter: '@ViewBag.CurrentFilter',
+                        pageNumber: '@Model.PageIndex'
+                    },
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'  // Mark as AJAX request
                     },
                     success: function (result) {
-                        // Replace the entire donation list container content
+                        // Replace only the table content inside the donation list container
                         $('#donationListContainer').html(result);
                         updateLastRefreshTime();
                         console.log("Donation list refreshed successfully");

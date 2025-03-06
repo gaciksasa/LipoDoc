@@ -94,13 +94,16 @@ namespace DeviceDataCollector.Controllers
             // Check if it's an AJAX request for auto-refresh
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
-                // For AJAX requests, just return the first page of data
-                var firstPageData = await query
+                // For AJAX requests, we'll use the current page number from the request
+                // This allows us to refresh data for the current page the user is viewing
+                var ajaxPageIndex = pageNumber ?? 1;
+                var ajaxPageData = await query
+                    .Skip((ajaxPageIndex - 1) * _pageSize)
                     .Take(_pageSize)
                     .ToListAsync();
 
                 // Return the partial view for AJAX refresh
-                return PartialView("_DonationList", firstPageData);
+                return PartialView("_DonationList", ajaxPageData);
             }
 
             // For normal page loads, return paginated data
