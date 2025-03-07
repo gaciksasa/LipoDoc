@@ -131,10 +131,10 @@ body {
     border-color: var(--bs-info);
 }
 
-    .btn-outline-info:hover {
-        background-color: var(--bs-info);
-        color: white;
-    }
+.btn-outline-info:hover {
+    background-color: var(--bs-info);
+    color: white;
+}
 
 /* Active states for outlined buttons */
 .btn-outline-primary:active, .btn-outline-primary.active {
@@ -325,9 +325,9 @@ a {
     color: var(--bs-primary);
 }
 
-    a:hover {
-        color: #8e1b52; /* Darker shade of primary */
-    }
+a:hover {
+    color: #8e1b52; /* Darker shade of primary */
+}
 
 /* Override the navbar */
 .navbar-light {

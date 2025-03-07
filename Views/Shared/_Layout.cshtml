@@ -1,4 +1,4 @@
-﻿
+﻿<!-- Views/Shared/_Layout.cshtml -->
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
 <head>
@@ -10,53 +10,10 @@
     <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/DeviceDataCollector.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <style>
-        /* Custom styles for the sidebar */
-        .sidebar {
-            background-color: #dddddd;
-            width: 300px;
-            min-height: calc(100vh - 160px); /* Adjusted for header and footer */
-        }
-
-        .main-content {
-            min-height: calc(100vh - 160px); /* Adjusted for header and footer */
-        }
-
-        .sidebar .nav-link {
-            color: #000000;
-            padding: 0.5rem 1rem;
-            margin-bottom: 0.25rem;
-            border-radius: 0.25rem;
-        }
-
-        .sidebar .nav-link:hover {
-            color: #000000;
-            background-color: #f8f9fa;
-        }
-
-        /* For small screens, make sidebar scrollable instead of collapsible */
-        @@media (max-width: 768px) {
-            .container-fluid.main-container {
-                flex-direction: column;
-            }
-
-            .sidebar {
-                width: 100%;
-                min-height: auto;
-                max-height: 200px;
-                overflow-y: auto;
-            }
-
-            .main-content {
-                width: 100%;
-            }
-
-        }
-    </style>
 </head>
-<body class="theme-transition d-flex flex-column min-vh-100">
-    <!-- Full-width top bar with dark gray color -->
-    <header class="navbar navbar-expand-lg bg-primary shadow-sm theme-transition">
+<body class="d-flex flex-column min-vh-100 theme-transition">
+    <!-- Full-width top bar with primary color -->
+    <header class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm theme-transition">
         <div class="container-fluid px-4">
             <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">LipoDoc Data Collector</a>
             <button class="navbar-toggler navbar-dark" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTop" aria-controls="navbarTop"
@@ -66,7 +23,7 @@
             <div class="collapse navbar-collapse" id="navbarTop">
                 <div class="ms-auto d-flex align-items-center">
                     <!-- Theme Toggle Button -->
-                    <button id="theme-toggle" class="theme-toggle btn btn-sm me-3 theme-transition">
+                    <button id="theme-toggle" class="btn btn-sm me-3 theme-transition">
                         <i id="theme-icon" class="bi bi-brightness-high"></i>
                     </button>
 
@@ -104,47 +61,55 @@
         </div>
     </header>
 
-    <!-- Main layout with sidebar and content -->
-    <div class="flex-grow-1 d-flex main-container">
-        <!-- Sidebar navigation - 300px wide with primary background -->
-        @if (User.Identity?.IsAuthenticated == true)
-        {
-            <div class="sidebar p-3 theme-transition">
-                <ul class="nav flex-column">
-                    <li class="nav-item">
-                        <a class="nav-link theme-transition" asp-controller="Home" asp-action="Index">
-                            <i class="bi bi-house"></i> Home
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link theme-transition" asp-controller="Donations" asp-action="Index">
-                            <i class="bi bi-droplet"></i> Donations
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link theme-transition" asp-controller="Devices" asp-action="Index">
-                            <i class="bi bi-hdd-network"></i> Devices
-                        </a>
-                    </li>
-                    @if (User.IsInRole("Admin"))
-                    {
+    <!-- Main layout with sidebar and content using Bootstrap grid -->
+    <div class="container-fluid flex-grow-1">
+        <div class="row">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <!-- Sidebar navigation using Bootstrap grid -->
+                <div class="col-md-3 col-lg-2 bg-light pt-3 pb-3 theme-transition" style="min-height: calc(100vh - 160px);">
+                    <ul class="nav nav-pills flex-column">
                         <li class="nav-item">
-                            <a class="nav-link theme-transition" asp-controller="Users" asp-action="Index">
-                                <i class="bi bi-person-gear"></i> Users
+                            <a class="nav-link link-dark theme-transition" asp-controller="Home" asp-action="Index">
+                                <i class="bi bi-house"></i> Dashboard
                             </a>
                         </li>
-                    }
-                </ul>
-            </div>
-        }
-
-        <!-- Main content area -->
-        <div class="main-content p-4 flex-grow-1">
-            @RenderBody()
+                        <li class="nav-item">
+                            <a class="nav-link theme-transition" asp-controller="Donations" asp-action="Index">
+                                <i class="bi bi-droplet"></i> Donations
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link theme-transition" asp-controller="Devices" asp-action="Index">
+                                <i class="bi bi-hdd-network"></i> Devices
+                            </a>
+                        </li>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link theme-transition" asp-controller="Users" asp-action="Index">
+                                    <i class="bi bi-person-gear"></i> Users
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <!-- Main content area -->
+                <div class="col-md-9 col-lg-10 p-4" style="min-height: calc(100vh - 160px);">
+                    @RenderBody()
+                </div>
+            }
+            else
+            {
+                <!-- If not authenticated, use full width for content -->
+                <div class="col-12 p-4">
+                    @RenderBody()
+                </div>
+            }
         </div>
     </div>
 
-    <!-- Full width footer with dark gray color -->
+    <!-- Full width footer with primary color -->
     <footer class="footer bg-primary theme-transition">
         <div class="container-fluid px-4">
             &copy; 2025 - LipoDoc Data Collector - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
