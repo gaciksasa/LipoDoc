@@ -13,7 +13,7 @@
 <body class="theme-transition">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light border-bottom box-shadow mb-3 theme-transition">
-            <div class="container-fluid">
+            <div class="container">
                 <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">LipoDoc Data Collector</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
@@ -22,7 +22,7 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link theme-transition" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link theme-transition" asp-area="" asp-controller="Home" asp-action="Index"><i class="bi bi-house"></i> Home</a>
                         </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
@@ -41,7 +41,7 @@
                             {
                                 <li class="nav-item">
                                     <a class="nav-link theme-transition" asp-area="" asp-controller="Users" asp-action="Index">
-                                        <i class="bi bi-person-gear"></i> User Management
+                                        <i class="bi bi-person-gear"></i> Users
                                     </a>
                                 </li>
                             }
@@ -60,14 +60,6 @@
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle theme-transition" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="bi bi-person-circle"></i> @User.Identity.Name
-                                    @if (User.IsInRole("Admin"))
-                                    {
-                                        <span class="badge bg-primary">Admin</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-secondary">User</span>
-                                    }
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                                     <li>
