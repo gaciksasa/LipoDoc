@@ -108,9 +108,9 @@ body {
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 
-    .card:hover {
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
 
 .card-header, .card-footer {
     transition: background-color 0.3s ease;
@@ -210,23 +210,6 @@ body {
     color: #e9ecef;
 }
 
-/* Theme toggle button styling */
-.theme-toggle {
-    cursor: pointer;
-    padding: 0.25rem 0.75rem;
-    font-size: 1.25rem;
-    border: none;
-    background: transparent;
-    color: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-    .theme-toggle:hover {
-        opacity: 0.8;
-    }
-
 /* Button styling */
 .btn-primary {
     background-color: var(--bs-primary);
@@ -291,36 +274,36 @@ body {
     transition: all 0.2s ease-in-out;
 }
 
-    /* Badge colors */
-    .badge.bg-primary {
-        background-color: var(--bs-primary) !important;
-        color: #fff;
-    }
+/* Badge colors */
+.badge.bg-primary {
+    background-color: var(--bs-primary) !important;
+    color: #fff;
+}
 
-    .badge.bg-secondary {
-        background-color: var(--bs-secondary) !important;
-        color: #fff;
-    }
+.badge.bg-secondary {
+    background-color: var(--bs-secondary) !important;
+    color: #fff;
+}
 
-    .badge.bg-success {
-        background-color: var(--bs-success) !important;
-        color: #fff;
-    }
+.badge.bg-success {
+    background-color: var(--bs-success) !important;
+    color: #fff;
+}
 
-    .badge.bg-danger {
-        background-color: var(--bs-danger) !important;
-        color: #fff;
-    }
+.badge.bg-danger {
+    background-color: var(--bs-danger) !important;
+    color: #fff;
+}
 
-    .badge.bg-warning {
-        background-color: var(--bs-warning) !important;
-        color: #fff; /* White text for better contrast in monochromatic theme */
-    }
+.badge.bg-warning {
+    background-color: var(--bs-warning) !important;
+    color: #fff; /* White text for better contrast in monochromatic theme */
+}
 
-    .badge.bg-info {
-        background-color: var(--bs-info) !important;
-        color: #212529; /* Dark text for better contrast on light pink */
-    }
+.badge.bg-info {
+    background-color: var(--bs-info) !important;
+    color: #212529; /* Dark text for better contrast on light pink */
+}
 
 /* Smooth transitions for theme changes */
 .theme-transition {
@@ -429,10 +412,10 @@ body {
     color: var(--bs-primary);
 }
 
-    .page-link:hover {
-        color: #8e1b52;
-        background-color: var(--bs-light);
-    }
+.page-link:hover {
+    color: #8e1b52;
+    background-color: var(--bs-light);
+}
 
 .page-item.active .page-link {
     background-color: var(--bs-primary);
@@ -444,9 +427,9 @@ a {
     color: var(--bs-primary);
 }
 
-    a:hover {
-        color: #8e1b52; /* Darker shade of primary */
-    }
+a:hover {
+    color: #8e1b52; /* Darker shade of primary */
+}
 
 /* Dropdown styling */
 [data-bs-theme="dark"] .dropdown-menu {
@@ -458,14 +441,32 @@ a {
     color: var(--bs-body-color);
 }
 
-    [data-bs-theme="dark"] .dropdown-item:hover,
-    [data-bs-theme="dark"] .dropdown-item:focus {
-        background-color: rgba(255, 255, 255, 0.075);
-    }
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.075);
+}
 
 .dropdown-item.active,
 .dropdown-item:active {
     background-color: var(--bs-primary);
+}
+
+[data-bs-theme="light"] .nav-link {
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .nav-link {
+    color: var(--bs-body-color);
+}
+
+#theme-toggle, #theme-toggle:active, #theme-toggle:focus {
+    font-size: 18px;
+    color: #ffffff;
+    box-shadow: none;
+}
+
+.navbar .nav-link {
+    color: #ffffff;
 }
 
 /* Table Head colors */

@@ -66,39 +66,45 @@
             @if (User.Identity?.IsAuthenticated == true)
             {
                 <!-- Sidebar navigation using Bootstrap grid -->
-                <div class="col-md-3 col-lg-2 bg-light pt-3 pb-3 theme-transition" style="min-height: calc(100vh - 160px);">
+                <div class="col-md-3 col-lg-2 bg-light pt-3 pb-3 theme-transition" style="min-height: 100vh;">
                     @{
                         var controller = ViewContext.RouteData.Values["Controller"].ToString();
                         var action = ViewContext.RouteData.Values["Action"].ToString();
                     }
                     <ul class="nav nav-pills flex-column">
                         <li class="nav-item">
-                            <a class="nav-link @(controller == "Home" && action == "Index" ? "active" : "link-dark") theme-transition" asp-controller="Home" asp-action="Index">
+                            <a class="nav-link @(controller == "Home" && action == "Index" ? "active" : "") theme-transition" asp-controller="Home" asp-action="Index">
                                 <i class="bi bi-house"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link @(controller == "Donations" ? "active" : "link-dark") theme-transition" asp-controller="Donations" asp-action="Index">
+                            <a class="nav-link @(controller == "Donations" ? "active" : "") theme-transition" asp-controller="Donations" asp-action="Index">
                                 <i class="bi bi-droplet"></i> Donations
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link @(controller == "Devices" ? "active" : "link-dark") theme-transition" asp-controller="Devices" asp-action="Index">
+                            <a class="nav-link @(controller == "Devices" ? "active" : "") theme-transition" asp-controller="Devices" asp-action="Index">
                                 <i class="bi bi-hdd-network"></i> Devices
                             </a>
                         </li>
                         @if (User.IsInRole("Admin"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link @(controller == "Users" ? "active" : "link-dark") theme-transition" asp-controller="Users" asp-action="Index">
+                                <a class="nav-link @(controller == "Users" ? "active" : "") theme-transition" asp-controller="Users" asp-action="Index">
                                     <i class="bi bi-person-gear"></i> Users
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link @(controller == "Settings" ? "active" : "") theme-transition" asp-controller="Settings" asp-action="Index">
+                                    <i class="bi bi-person-gear"></i> Settings
                                 </a>
                             </li>
                         }
                     </ul>
                 </div>
                 <!-- Main content area -->
-                <div class="col-md-9 col-lg-10 p-4" style="min-height: calc(100vh - 160px);">
+                <div class="col-md-9 col-lg-10 p-4" style="min-height:100vh;">
                     @RenderBody()
                 </div>
             }
@@ -114,8 +120,8 @@
 
     <!-- Full width footer with primary color -->
     <footer class="footer bg-primary theme-transition">
-        <div class="container-fluid px-4">
-            &copy; 2025 - LipoDoc Data Collector - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+        <div class="container-fluid px-4 text-white">
+            &copy; 2025 - LipoDoc Data Collector
         </div>
     </footer>
 
