@@ -1,0 +1,31 @@
+﻿@using Microsoft.AspNetCore.Mvc.Rendering
+
+@functions {
+    public static string IsActive(ViewContext viewContext, string controller, string action = "")
+    {
+        string currentController = viewContext.RouteData.Values["Controller"].ToString();
+        string currentAction = viewContext.RouteData.Values["Action"].ToString();
+
+        if (string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrEmpty(action) || string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase))
+            {
+                return "active";
+            }
+        }
+
+        return "";
+    }
+
+    public static string IsActiveController(ViewContext viewContext, string controller)
+    {
+        string currentController = viewContext.RouteData.Values["Controller"].ToString();
+
+        if (string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase))
+        {
+            return "active";
+        }
+
+        return "";
+    }
+}
