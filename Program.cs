@@ -1,4 +1,5 @@
 using DeviceDataCollector.Data;
+using DeviceDataCollector.Middleware;
 using DeviceDataCollector.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
@@ -154,6 +155,7 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAuthenticationRedirect();
 
 app.MapControllerRoute(
     name: "default",
