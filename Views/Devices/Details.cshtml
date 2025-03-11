@@ -74,7 +74,7 @@
                             <strong>Registered</strong>
                         </div>
                         <div class="col-md-8">
-                            @Model.RegisteredDate.ToString("yyyy-MM-dd HH:mm:ss")
+                            @Model.RegisteredDate.ToString("dd.MM.yyyy HH:mm:ss")
                         </div>
                     </div>
 
@@ -85,7 +85,7 @@
                         <div class="col-md-8">
                             @if (Model.LastConnectionTime.HasValue)
                             {
-                                @Model.LastConnectionTime.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                                @Model.LastConnectionTime.Value.ToString("dd.MM.yyyy HH:mm:ss")
                             }
                             else
                             {
@@ -141,7 +141,7 @@
                                 <strong>Last Update</strong>
                             </div>
                             <div class="col-md-8">
-                                @latestStatus.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                                @latestStatus.Timestamp.ToString("dd.MM.yyyy HH:mm:ss")
                             </div>
                         </div>
 

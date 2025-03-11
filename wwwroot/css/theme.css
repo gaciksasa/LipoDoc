@@ -484,6 +484,22 @@ thead {
     color: var(--bs-primary);
 }
 
+.accordion-item, .accordion-button {
+    background-color: transparent;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: transparent;
+    color: var(--bs-body-color);
+    box-shadow: none;
+}
+
+.accordion-button:focus {
+    box-shadow: none;
+    /* background-color: var(--bs-primary); 
+    color: white !important; */
+}
+
 /* Preserve light/dark toggling while maintaining pink theme */
 html {
     font-size: 14px;

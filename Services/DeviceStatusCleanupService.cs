@@ -68,7 +68,7 @@ namespace DeviceDataCollector.Services
 
                 // Calculate cutoff date
                 var cutoffDate = DateTime.Now.Subtract(_retentionPeriod);
-                _logger.LogInformation($"Removing status records older than {cutoffDate:yyyy-MM-dd HH:mm:ss}");
+                _logger.LogInformation($"Removing status records older than {cutoffDate:dd.MM.yyyy HH:mm:ss}");
 
                 // Different strategies for cleanup depending on database size:
 

@@ -49,7 +49,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function applyPinkTheme() {
         // The pink theme is now applied via CSS variables in theme.css
         // This function exists for potential future dynamic theme adjustments
-        console.log('Pink monochromatic theme applied');
     }
 
     // Apply the pink theme (on top of light/dark preference)
@@ -116,7 +115,6 @@ function initializeAutoRefresh() {
             .then(html => {
                 listContainer.innerHTML = html;
                 updateLastRefreshTime();
-                console.log(`${controller} list refreshed successfully`);
             })
             .catch(error => {
                 console.error(`Error refreshing ${controller} list:`, error);

@@ -7,7 +7,7 @@ namespace DeviceDataCollector.Helpers
         /// <summary>
         /// Formats a DateTime for display with a standard format
         /// </summary>
-        public static string ToDisplayFormat(this DateTime dateTime, string format = "yyyy-MM-dd HH:mm:ss")
+        public static string ToDisplayFormat(this DateTime dateTime, string format = "dd.MM.yyyy HH:mm:ss")
         {
             return dateTime.ToString(format);
         }
@@ -15,7 +15,7 @@ namespace DeviceDataCollector.Helpers
         /// <summary>
         /// Formats a nullable DateTime for display with a standard format
         /// </summary>
-        public static string ToDisplayFormat(this DateTime? dateTime, string format = "yyyy-MM-dd HH:mm:ss", string nullValue = "Never")
+        public static string ToDisplayFormat(this DateTime? dateTime, string format = "dd.MM.yyyy HH:mm:ss", string nullValue = "Never")
         {
             return dateTime.HasValue ? dateTime.Value.ToString(format) : nullValue;
         }

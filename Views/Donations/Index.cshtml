@@ -116,7 +116,7 @@
                                         @Html.DisplayFor(modelItem => item.DeviceId)
                                     </td>
                                     <td>
-                                        @item.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                                        @item.Timestamp.ToString("dd.MM.yyyy HH:mm:ss")
                                     </td>
                                     <td>
                                         @(item.LipemicValue?.ToString() ?? "-")
@@ -281,7 +281,6 @@
                         // Replace only the table content inside the donation list container
                         $('#donationListContainer').html(result);
                         updateLastRefreshTime();
-                        console.log("Donation list refreshed successfully");
                     },
                     error: function (error) {
                         console.error("Error refreshing donation list:", error);

@@ -67,7 +67,7 @@
                         @foreach (var item in Model)
                         {
                             <tr>
-                                <td>@item.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@item.Timestamp.ToString("dd.MM.yyyy HH:mm:ss")</td>
                                 <td>@(string.IsNullOrEmpty(item.DonationIdBarcode) ? "-" : item.DonationIdBarcode)</td>
                                 <td>@(string.IsNullOrEmpty(item.RefCode) ? "-" : item.RefCode)</td>
                                 <td>@(string.IsNullOrEmpty(item.OperatorIdBarcode) ? "-" : item.OperatorIdBarcode)</td>

@@ -209,7 +209,7 @@ namespace DeviceDataCollector.Services
         {
             // Create a hash to identify this exact message
             using var sha = SHA256.Create();
-            string uniqueString = $"{message}|{ipAddress}|{port}|{DateTime.Now:yyyy-MM-dd}";
+            string uniqueString = $"{message}|{ipAddress}|{port}|{DateTime.Now:dd.MM.yyyy}";
             byte[] inputBytes = Encoding.UTF8.GetBytes(uniqueString);
             byte[] hashBytes = sha.ComputeHash(inputBytes);
 

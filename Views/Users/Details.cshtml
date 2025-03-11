@@ -64,7 +64,7 @@
                             <strong>Created</strong>
                         </div>
                         <div class="col-md-8">
-                            @Model.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                            @Model.CreatedAt.ToString("dd.MM.yyyy HH:mm:ss")
                         </div>
                     </div>
 
@@ -73,7 +73,7 @@
                             <strong>Last Login</strong>
                         </div>
                         <div class="col-md-8">
-                            @(Model.LastLogin.HasValue ? Model.LastLogin.Value.ToString("yyyy-MM-dd HH:mm:ss") : "Never")
+                            @(Model.LastLogin.HasValue ? Model.LastLogin.Value.ToString("dd.MM.yyyy HH:mm:ss") : "Never")
                         </div>
                     </div>
 
