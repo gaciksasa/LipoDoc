@@ -1,0 +1,253 @@
+﻿@model DeviceDataCollector.Models.DatabaseConnectionViewModel
+@{
+    ViewData["Title"] = "Database Settings";
+}
+
+<div class="container">
+    <h1 class="mb-4">Settings > Database</h1>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Database Connection Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Database" method="post">
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Server" class="form-label fw-bold">Server</label>
+                            <input asp-for="Server" class="form-control" />
+                            <span asp-validation-for="Server" class="text-danger"></span>
+                            <div class="form-text">Database server hostname or IP address</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Port" class="form-label fw-bold">Port</label>
+                            <input asp-for="Port" class="form-control" type="number" min="1" max="65535" />
+                            <span asp-validation-for="Port" class="text-danger"></span>
+                            <div class="form-text">Database server port (default: 3306 for MySQL)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Database" class="form-label fw-bold">Database Name</label>
+                            <input asp-for="Database" class="form-control" />
+                            <span asp-validation-for="Database" class="text-danger"></span>
+                            <div class="form-text">Name of the database to connect to</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Username" class="form-label fw-bold">Username</label>
+                            <input asp-for="Username" class="form-control" />
+                            <span asp-validation-for="Username" class="text-danger"></span>
+                            <div class="form-text">Database user account</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label fw-bold">Password</label>
+                            <div class="input-group">
+                                <input asp-for="Password" class="form-control" type="password" id="passwordField" />
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                            <div class="form-text">Database user password</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Connection String</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="connectionStringPreview" readonly value="@Model.BuildConnectionString()" />
+                                <button class="btn btn-outline-secondary" type="button" id="copyConnectionString">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">Preview of the connection string</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" id="testConnection">
+                                <i class="bi bi-database-check"></i> Test Connection
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Save Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Important:</strong> Changing database settings requires application restart to take effect.
+                    </div>
+
+                    <p>These settings modify the database connection string in <code>appsettings.json</code>.</p>
+
+                    <p><strong>Database Type:</strong> MySQL</p>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        <strong>Note:</strong> For security reasons, database credentials should be managed carefully in production environments.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Database Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="connectionStatus" class="alert alert-secondary">
+                        <i class="bi bi-question-circle me-2"></i> Connection not tested
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Database Version</label>
+                        <input type="text" class="form-control" id="dbVersion" readonly value="Not available" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Database Size</label>
+                        <input type="text" class="form-control" id="dbSize" readonly value="Not available" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        // Toggle password visibility
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordField = document.getElementById('passwordField');
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+
+            // Toggle the eye icon
+            const eyeIcon = this.querySelector('i');
+            eyeIcon.classList.toggle('bi-eye');
+            eyeIcon.classList.toggle('bi-eye-slash');
+        });
+
+        // Copy connection string to clipboard
+        document.getElementById('copyConnectionString').addEventListener('click', function() {
+            const connectionString = document.getElementById('connectionStringPreview');
+            connectionString.select();
+            document.execCommand('copy');
+
+            // Show feedback
+            const originalHTML = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-check"></i>';
+            setTimeout(() => {
+                this.innerHTML = originalHTML;
+            }, 2000);
+        });
+
+        // Preview the connection string as user inputs change
+        function updateConnectionString() {
+            const server = document.querySelector('[name="Server"]').value;
+            const port = document.querySelector('[name="Port"]').value;
+            const database = document.querySelector('[name="Database"]').value;
+            const username = document.querySelector('[name="Username"]').value;
+            const password = document.querySelector('[name="Password"]').value;
+
+            const connectionString = `server=${server};port=${port};database=${database};user=${username};password=${password}`;
+            document.getElementById('connectionStringPreview').value = connectionString;
+        }
+
+        // Attach input event handlers to all form inputs
+        document.querySelectorAll('form input').forEach(input => {
+            input.addEventListener('input', updateConnectionString);
+        });
+
+        // Test connection button
+        document.getElementById('testConnection').addEventListener('click', function() {
+            const statusDiv = document.getElementById('connectionStatus');
+
+            // Show loading state
+            statusDiv.innerHTML = '<i class="bi bi-hourglass-split me-2"></i> Testing connection...';
+            statusDiv.className = 'alert alert-secondary';
+
+            // Get form data
+            const server = document.querySelector('[name="Server"]').value;
+            const port = document.querySelector('[name="Port"]').value;
+            const database = document.querySelector('[name="Database"]').value;
+            const username = document.querySelector('[name="Username"]').value;
+            const password = document.querySelector('[name="Password"]').value;
+
+            // Send AJAX request
+            fetch('@Url.Action("TestConnection", "System")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                },
+                body: JSON.stringify({
+                    server: server,
+                    port: parseInt(port),
+                    database: database,
+                    username: username,
+                    password: password
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i> ${data.message}`;
+                    statusDiv.className = 'alert alert-success';
+
+                    // Update database info
+                    document.getElementById('dbVersion').value = data.version || 'MySQL Server';
+                    document.getElementById('dbSize').value = data.size || 'Unknown';
+                } else {
+                    statusDiv.innerHTML = `<i class="bi bi-x-circle-fill me-2"></i> ${data.message}`;
+                    statusDiv.className = 'alert alert-danger';
+
+                    // Reset database info
+                    document.getElementById('dbVersion').value = 'Not available';
+                    document.getElementById('dbSize').value = 'Not available';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<i class="bi bi-x-circle-fill me-2"></i> Connection test failed: Network error';
+                statusDiv.className = 'alert alert-danger';
+
+                // Reset database info
+                document.getElementById('dbVersion').value = 'Not available';
+                document.getElementById('dbSize').value = 'Not available';
+            });
+        });
+    </script>
+}

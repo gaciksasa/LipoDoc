@@ -47,6 +47,7 @@ builder.Services.AddScoped<DeviceMessageParser>();
 builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 builder.Services.AddSingleton<IViewContextAccessor, ViewContextAccessor>();
 builder.Services.AddScoped<NetworkUtilityService>();
+builder.Services.AddScoped<DatabaseConfigService>();
 
 var app = builder.Build();
 
