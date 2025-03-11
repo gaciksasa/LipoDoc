@@ -1,5 +1,4 @@
-﻿<!-- Views/System/Network.cshtml -->
-@model DeviceDataCollector.Controllers.NetworkViewModel
+﻿@model DeviceDataCollector.Controllers.NetworkViewModel
 
 @{
     ViewData["Title"] = "Network Configuration";
@@ -8,6 +7,22 @@
 <div class="container">
     <h1 class="mb-4">Settings > Network</h1>
 
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
     <div class="row">
         <div class="col-lg-8">
             <div class="card mb-4">
@@ -15,7 +30,7 @@
                     <h5 class="mb-0">Available Network Interfaces</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">The following IP addresses are available on this server. You can use any of these in your <code>appsettings.json</code> for the TCP server binding.</p>
+                    <p class="text-muted">The following IP addresses are available on this server. Click "Use this IP" to set it as the TCP server binding address.</p>
 
                     <table class="table table-striped">
                         <thead>
@@ -43,9 +58,20 @@
                                         }
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary copy-btn" data-ip="@ip.IPAddress">
-                                            <i class="bi bi-clipboard"></i> Copy
-                                        </button>
+                                        @if (ip.IPAddress == Model.CurrentTcpServerIP)
+                                        {
+                                            <span class="badge bg-success">Current</span>
+                                        }
+                                        else
+                                        {
+                                            <form asp-action="UpdateTcpServerIp" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="ipAddress" value="@ip.IPAddress" />
+                                                <button type="submit" class="btn btn-sm btn-primary">
+                                                    <i class="bi bi-check-circle"></i> Use this IP
+                                                </button>
+                                            </form>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -63,12 +89,7 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Binding IP Address</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" value="@Model.CurrentTcpServerIP" readonly />
-                            <button class="btn btn-outline-secondary copy-btn" data-ip="@Model.CurrentTcpServerIP">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </div>
+                        <input type="text" class="form-control" value="@Model.CurrentTcpServerIP" readonly />
                     </div>
 
                     <div class="mb-3">
@@ -78,7 +99,7 @@
 
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i>
-                        To change these settings, modify the <code>TCPServer</code> section in your <code>appsettings.json</code> file and restart the application.
+                        To change the TCP port, modify the <code>TCPServer:Port</code> setting in your <code>appsettings.json</code> file and restart the application.
                     </div>
                 </div>
             </div>
@@ -92,29 +113,12 @@
                     <p><strong>External IPs</strong> might be accessible from outside your network, depending on your router/firewall configuration.</p>
                     <p>For local testing, use <code>127.0.0.1</code> or any internal IP address.</p>
                     <p>For production, choose an IP address that can be reached by all your devices.</p>
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Note:</strong> Changes to the TCP server IP address require application restart to take effect.
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-@section Scripts {
-    <script>
-        // Copy to clipboard functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.copy-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const ip = this.getAttribute('data-ip');
-                    navigator.clipboard.writeText(ip).then(() => {
-                        // Change button text temporarily
-                        const originalHTML = this.innerHTML;
-                        this.innerHTML = '<i class="bi bi-check"></i> Copied';
-                        setTimeout(() => {
-                            this.innerHTML = originalHTML;
-                        }, 2000);
-                    });
-                });
-            });
-        });
-    </script>
-}

@@ -3,6 +3,7 @@ using DeviceDataCollector.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
+using System.Text.Json;
 
 namespace DeviceDataCollector.Controllers
 {
@@ -136,6 +137,82 @@ namespace DeviceDataCollector.Controllers
                 _logger.LogError(ex, "Error testing database connection");
                 return Json(new { success = false, message = ex.Message });
             }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateTcpServerIp(string ipAddress)
+        {
+            try
+            {
+                string appSettingsPath = Path.Combine(_environment.ContentRootPath, "appsettings.json");
+
+                // Read the current content
+                string json = await System.IO.File.ReadAllTextAsync(appSettingsPath);
+
+                // Parse JSON
+                using JsonDocument doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Create a new JSON document with the updated IP
+                using var ms = new MemoryStream();
+                using var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true });
+
+                writer.WriteStartObject();
+
+                // Copy all properties from the root
+                foreach (var property in root.EnumerateObject())
+                {
+                    writer.WritePropertyName(property.Name);
+
+                    if (property.Name == "TCPServer")
+                    {
+                        writer.WriteStartObject();
+
+                        // Write all properties of TCPServer
+                        foreach (var serverProp in property.Value.EnumerateObject())
+                        {
+                            writer.WritePropertyName(serverProp.Name);
+
+                            if (serverProp.Name == "IPAddress")
+                            {
+                                writer.WriteStringValue(ipAddress);
+                            }
+                            else
+                            {
+                                serverProp.Value.WriteTo(writer);
+                            }
+                        }
+
+                        writer.WriteEndObject();
+                    }
+                    else
+                    {
+                        property.Value.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+                writer.Flush();
+
+                string newJson = Encoding.UTF8.GetString(ms.ToArray());
+
+                // Write the changes back to the file
+                await System.IO.File.WriteAllTextAsync(appSettingsPath, newJson);
+
+                // Force configuration reload to reflect changes immediately
+                ((IConfigurationRoot)_configuration).Reload();
+
+                TempData["SuccessMessage"] = $"TCP Server IP address updated to {ipAddress}. Application restart may be required for changes to take effect.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating TCP Server IP address");
+                TempData["ErrorMessage"] = $"Failed to update TCP Server IP: {ex.Message}";
+            }
+
+            // This will cause the Network action to run again and refresh all data
+            return RedirectToAction(nameof(Network));
         }
 
         // Method for the Backup settings page (placeholder)
