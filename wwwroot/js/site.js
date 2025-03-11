@@ -180,3 +180,20 @@ function initializeAutoRefresh() {
     // Initialize auto-refresh
     startAutoRefresh();
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Check if the current page is a settings subpage
+    const controller = document.body.getAttribute('data-controller');
+    const action = document.body.getAttribute('data-action');
+
+    // If we're on a System controller page, expand the settings accordion
+    if (controller === 'System') {
+        const settingsCollapse = document.getElementById('settingsCollapse');
+        if (settingsCollapse) {
+            const bsCollapse = new bootstrap.Collapse(settingsCollapse, {
+                toggle: false
+            });
+            bsCollapse.show();
+        }
+    }
+});
