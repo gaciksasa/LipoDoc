@@ -13,17 +13,20 @@ namespace DeviceDataCollector.Controllers
         private readonly IConfiguration _configuration;
         private readonly DatabaseConfigService _databaseConfigService;
         private readonly ILogger<SystemController> _logger;
+        private readonly IWebHostEnvironment _environment;
 
         public SystemController(
             NetworkUtilityService networkUtilityService,
             IConfiguration configuration,
             DatabaseConfigService databaseConfigService,
-            ILogger<SystemController> logger)
+            ILogger<SystemController> logger,
+            IWebHostEnvironment environment)  
         {
             _networkUtilityService = networkUtilityService;
             _configuration = configuration;
             _databaseConfigService = databaseConfigService;
             _logger = logger;
+            _environment = environment;  
         }
 
         public IActionResult Network()
@@ -46,6 +49,23 @@ namespace DeviceDataCollector.Controllers
             // Parse the connection string to extract individual components
             var connectionInfo = ParseConnectionString(connectionString);
 
+            // Check write permissions
+            string appSettingsPath = Path.Combine(_environment.ContentRootPath, "appsettings.json");
+            try
+            {
+                using (FileStream fs = new FileStream(appSettingsPath,
+                       FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                {
+                    // If we get here, we have permissions
+                    ViewBag.HasWritePermission = true;
+                }
+            }
+            catch
+            {
+                ViewBag.HasWritePermission = false;
+                ViewBag.PermissionWarning = "Warning: The application does not have write permission to appsettings.json. Changes may not be saved.";
+            }
+
             return View(connectionInfo);
         }
 
@@ -63,18 +83,20 @@ namespace DeviceDataCollector.Controllers
                     // Test the connection before saving
                     var testResult = await _databaseConfigService.TestConnectionAsync(connectionString);
 
-                    if (!testResult.Success)
-                    {
-                        ModelState.AddModelError("", $"Connection test failed: {testResult.Message}");
-                        return View(model);
-                    }
-
-                    // Try to update the configuration file
+                    // Update the configuration file regardless of connection test result
                     bool updated = await _databaseConfigService.UpdateConnectionStringAsync(connectionString);
 
                     if (updated)
                     {
-                        TempData["SuccessMessage"] = "Database settings saved successfully. Application restart may be required for changes to take effect.";
+                        if (testResult.Success)
+                        {
+                            TempData["SuccessMessage"] = "Database settings saved successfully and connection test passed. Application restart may be required for changes to take effect.";
+                        }
+                        else
+                        {
+                            // Still save the settings, but warn user about connection failure
+                            TempData["WarningMessage"] = "Database settings saved, but connection test failed: " + testResult.Message + ". Please check your settings and ensure the database server is running.";
+                        }
                     }
                     else
                     {
@@ -135,6 +157,8 @@ namespace DeviceDataCollector.Controllers
                 Password = "root"
             };
 
+            _logger.LogDebug($"Connection string to parse: {connectionString}");
+
             // Parse the connection string
             if (!string.IsNullOrEmpty(connectionString))
             {
@@ -172,6 +196,8 @@ namespace DeviceDataCollector.Controllers
                             break;
                     }
                 }
+
+                _logger.LogDebug($"Parsed values - Server: {model.Server}, Database: {model.Database}, Username: {model.Username}, Password: {model.Password}");
             }
 
             return model;

@@ -98,6 +98,8 @@ namespace DeviceDataCollector.Services
         /// <summary>
         /// Updates the connection string in appsettings.json
         /// </summary>
+        // In Services/DatabaseConfigService.cs
+
         public async Task<bool> UpdateConnectionStringAsync(string connectionString)
         {
             try
@@ -106,6 +108,10 @@ namespace DeviceDataCollector.Services
 
                 // Read the current appsettings.json
                 string json = await File.ReadAllTextAsync(appSettingsPath);
+
+                // Remove any comments (JSON doesn't officially support comments, but sometimes they're added)
+                // Many .NET projects use comments in JSON files even though standard JSON doesn't support them
+                json = RemoveJsonComments(json);
 
                 // Parse it to a JSON document
                 using JsonDocument doc = JsonDocument.Parse(json);
@@ -170,6 +176,75 @@ namespace DeviceDataCollector.Services
                 _logger.LogError(ex, "Error updating connection string in appsettings.json");
                 return false;
             }
+        }
+
+        // Helper method to remove comments from JSON before parsing
+        private string RemoveJsonComments(string json)
+        {
+            // Implementation to remove both single-line and multi-line comments
+            var lines = json.Split('\n');
+            var sb = new StringBuilder();
+            bool inMultilineComment = false;
+
+            foreach (var line in lines)
+            {
+                if (inMultilineComment)
+                {
+                    // Check if this line ends the multiline comment
+                    int endIndex = line.IndexOf("*/");
+                    if (endIndex >= 0)
+                    {
+                        inMultilineComment = false;
+                        // Add rest of the line after comment end
+                        sb.AppendLine(line.Substring(endIndex + 2));
+                    }
+                    // Otherwise skip the line entirely
+                    continue;
+                }
+
+                string currentLine = line;
+
+                // Check for start of multiline comment
+                int startMultiIndex = currentLine.IndexOf("/*");
+                if (startMultiIndex >= 0)
+                {
+                    // Check if the multiline comment ends on same line
+                    int endMultiIndex = currentLine.IndexOf("*/", startMultiIndex + 2);
+                    if (endMultiIndex >= 0)
+                    {
+                        // Remove just this comment
+                        currentLine = currentLine.Substring(0, startMultiIndex) +
+                                      currentLine.Substring(endMultiIndex + 2);
+                    }
+                    else
+                    {
+                        // Comment continues to next line
+                        inMultilineComment = true;
+                        currentLine = currentLine.Substring(0, startMultiIndex);
+                    }
+                }
+
+                // Check for single-line comment
+                int singleCommentIndex = currentLine.IndexOf("//");
+                if (singleCommentIndex >= 0)
+                {
+                    // Remove everything after the comment
+                    currentLine = currentLine.Substring(0, singleCommentIndex);
+                }
+
+                // Add the processed line if it's not empty
+                if (!string.IsNullOrWhiteSpace(currentLine))
+                {
+                    sb.AppendLine(currentLine);
+                }
+                else
+                {
+                    // Keep empty lines for formatting
+                    sb.AppendLine();
+                }
+            }
+
+            return sb.ToString();
         }
     }
 }
