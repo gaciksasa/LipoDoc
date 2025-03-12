@@ -154,6 +154,8 @@ namespace DeviceDataCollector.Services
             }
         }
 
+        // Services/DeviceMessageParser.cs - completely rewrite the ParseDataMessage method
+
         private DonationsData ParseDataMessage(string message, string ipAddress, int port)
         {
             // Format depends on the barcode mode, but all start with: #DªSNªvreme.timevreme.dateª
@@ -161,7 +163,7 @@ namespace DeviceDataCollector.Services
 
             _logger.LogDebug($"Data message parts count: {parts.Length}, parts: {string.Join(", ", parts)}");
 
-            if (parts.Length < 5)
+            if (parts.Length < 4) // Minimum: #D, SN, timestamp, and something else
             {
                 _logger.LogWarning($"Invalid data message format (not enough parts): {message}");
                 return null;
@@ -179,43 +181,93 @@ namespace DeviceDataCollector.Services
                     Port = port
                 };
 
-                // Check if barcode mode is enabled
-                int startIndex = 3;
-                if (parts[startIndex] == "B")
+                // First, let's find the key markers
+                int bIndex = -1;
+                int mIndex = -1;
+
+                for (int i = 3; i < parts.Length; i++)
                 {
-                    donationData.IsBarcodeMode = true;
-                    startIndex++; // Skip the B marker
-
-                    // Extract barcode data based on position and availability
-                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                        donationData.RefCode = parts[startIndex];
-                    startIndex++;
-
-                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                        donationData.DonationIdBarcode = parts[startIndex];
-                    startIndex++;
-
-                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                        donationData.OperatorIdBarcode = parts[startIndex];
-                    startIndex++;
-
-                    if (startIndex < parts.Length && !string.IsNullOrEmpty(parts[startIndex]))
-                        donationData.LotNumber = parts[startIndex];
-                    startIndex++;
+                    if (parts[i] == "B") bIndex = i;
+                    if (parts[i] == "M") mIndex = i;
                 }
 
-                // Find the "M" marker which indicates start of measurement data
-                int measurementIndex = Array.IndexOf(parts, "M", startIndex);
-                if (measurementIndex >= 0)
+                _logger.LogDebug($"B marker at position: {bIndex}, M marker at position: {mIndex}");
+
+                // Process barcode data if B marker found
+                if (bIndex >= 0)
                 {
-                    if (measurementIndex + 1 < parts.Length && int.TryParse(parts[measurementIndex + 1], out int lipemicValue))
+                    donationData.IsBarcodeMode = true;
+
+                    // Calculate how many barcode fields we have between B and M (or end)
+                    int endIndex = mIndex > 0 ? mIndex : parts.Length;
+                    int barcodeFieldsCount = endIndex - bIndex - 1;
+
+                    _logger.LogDebug($"Barcode fields count: {barcodeFieldsCount}");
+
+                    // Assign barcode fields based on their position after B marker
+                    for (int i = 0; i < barcodeFieldsCount && bIndex + 1 + i < parts.Length; i++)
+                    {
+                        string value = parts[bIndex + 1 + i];
+                        if (string.IsNullOrEmpty(value)) continue;
+
+                        switch (i)
+                        {
+                            case 0: donationData.RefCode = value; break;
+                            case 1: donationData.DonationIdBarcode = value; break;
+                            case 2: donationData.OperatorIdBarcode = value; break;
+                            case 3: donationData.LotNumber = value; break;
+                        }
+                    }
+                }
+
+                // Process measurement data if M marker found
+                if (mIndex >= 0 && mIndex + 1 < parts.Length)
+                {
+                    // Extract lipemic data based on position after M marker
+                    if (mIndex + 1 < parts.Length && int.TryParse(parts[mIndex + 1], out int lipemicValue))
                         donationData.LipemicValue = lipemicValue;
 
-                    if (measurementIndex + 2 < parts.Length)
-                        donationData.LipemicGroup = parts[measurementIndex + 2];
+                    if (mIndex + 2 < parts.Length)
+                        donationData.LipemicGroup = parts[mIndex + 2];
 
-                    if (measurementIndex + 3 < parts.Length)
-                        donationData.LipemicStatus = parts[measurementIndex + 3];
+                    if (mIndex + 3 < parts.Length)
+                        donationData.LipemicStatus = parts[mIndex + 3];
+                }
+
+                // Handle special case when the message doesn't follow the expected format
+                // In some cases, B and M markers might not be correctly delimited
+                if (bIndex < 0 && mIndex < 0 && parts.Length >= 4)
+                {
+                    _logger.LogWarning("No B or M markers found, attempting alternate parsing");
+
+                    // Try to identify parts by their format
+                    for (int i = 3; i < parts.Length; i++)
+                    {
+                        string part = parts[i];
+
+                        // Try to detect numeric values that could be lipemic values
+                        if (int.TryParse(part, out int value) && value > 0)
+                        {
+                            donationData.LipemicValue = value;
+
+                            // Check if next item could be lipemic group (I, II, III, IV)
+                            if (i + 1 < parts.Length &&
+                                (parts[i + 1] == "I" || parts[i + 1] == "II" ||
+                                 parts[i + 1] == "III" || parts[i + 1] == "IV"))
+                            {
+                                donationData.LipemicGroup = parts[i + 1];
+
+                                // Check if next item could be lipemic status
+                                if (i + 2 < parts.Length &&
+                                    (parts[i + 2] == "LIPEMIC" || parts[i + 2] == "PASSED"))
+                                {
+                                    donationData.LipemicStatus = parts[i + 2];
+                                }
+                            }
+
+                            break;
+                        }
+                    }
                 }
 
                 // Extract checksum - it's the last part before the delimiter ý
