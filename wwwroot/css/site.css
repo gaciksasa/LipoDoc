@@ -257,7 +257,7 @@ body {
     box-shadow: none;
     transform: none;
 }
-
+    
 /* Override background colors */
 .bg-primary {
     background-color: var(--bs-primary) !important;
