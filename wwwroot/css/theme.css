@@ -261,6 +261,9 @@ body {
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
     box-shadow: none;
 }
+code {
+    color: var(--bs-primary);
+}◙
 
 /* Badge Styling */
 .badge {

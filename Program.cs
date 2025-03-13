@@ -49,11 +49,17 @@ builder.Services.AddScoped<BCrypt.Net.BCrypt>();
 builder.Services.AddSingleton<IViewContextAccessor, ViewContextAccessor>();
 builder.Services.AddScoped<NetworkUtilityService>();
 builder.Services.AddScoped<DatabaseConfigService>();
+builder.Services.AddScoped<DatabaseBackupService>(provider =>
+    new DatabaseBackupService(
+        provider.GetRequiredService<ILogger<DatabaseBackupService>>(),
+        provider.GetRequiredService<IConfiguration>(),
+        provider.GetRequiredService<IWebHostEnvironment>()));
+builder.Services.AddSingleton<ScheduledBackupService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<ScheduledBackupService>());
 
 var app = builder.Build();
 
-// Initialize database - improved to avoid recreating existing tables
-// Initialize database - improved to handle missing tables
+// Initialize database 
 try
 {
     using (var scope = app.Services.CreateScope())

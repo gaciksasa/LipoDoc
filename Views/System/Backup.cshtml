@@ -1,0 +1,256 @@
+﻿@model DeviceDataCollector.Models.BackupViewModel
+@{
+    ViewData["Title"] = "Backup";
+}
+
+<div class="container">
+    <h1 class="mb-4">Settings > Database Backup</h1>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Backup List -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Database Backups</h5>
+                    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#createBackupModal">
+                        <i class="bi bi-database-add"></i> Create Backup
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Description</th>
+                                    <th>Database</th>
+                                    <th>Date/Time</th>
+                                    <th>Size</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.Backups.Any())
+                                {
+                                    @foreach (var backup in Model.Backups)
+                                    {
+                                        <tr>
+                                            <td class="text-truncate" style="max-width: 200px;">@backup.FileName</td>
+                                            <td>@(string.IsNullOrEmpty(backup.Description) ? "-" : backup.Description)</td>
+                                            <td>@backup.Database</td>
+                                            <td>@backup.CreatedAt.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                            <td>@FormatFileSize(backup.FileSize)</td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a asp-action="DownloadBackup" asp-route-fileName="@backup.FileName" class="btn btn-sm btn-primary">
+                                                        <i class="bi bi-download"></i>
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm btn-danger"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#deleteBackupModal"
+                                                            data-backup-file="@backup.FileName">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3">No backups available</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    Total: @Model.BackupCount backup(s), @FormatFileSize(Model.TotalBackupSize)
+                </div>
+            </div>
+
+            <!-- Scheduled Backup Settings -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Scheduled Backup Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdateScheduledBackupSettings" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enableScheduledBackup" name="Enabled" @(Model.IsScheduledBackupEnabled ? "checked" : "")>
+                            <label class="form-check-label" for="enableScheduledBackup">Enable scheduled backups</label>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="backupTime" class="form-label">Backup Time (24h format)</label>
+                                <input type="text" class="form-control" id="backupTime" name="Time" value="@Model.ScheduledBackupTime" placeholder="03:00">
+                                <div class="form-text">Time when the daily backup will run (server time)</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="retentionCount" class="form-label">Number of Backups to Retain</label>
+                                <input type="number" class="form-control" id="retentionCount" name="RetentionCount" min="1" max="30" value="@Model.ScheduledBackupRetention">
+                                <div class="form-text">Older scheduled backups will be deleted automatically</div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Information Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Information</h5>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>Backup Location:</strong><br>
+                        <code>@Model.BackupDirectory</code>
+                    </p>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        <strong>How it works:</strong><br>
+                        Backups are created using one of two methods:<br>
+                        1. <code>mysqldump</code> utility (when available)<br>
+                        2. Direct database export using Entity Framework (fallback)
+                    </div>
+
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <strong>Compatibility:</strong><br>
+                        The backup system works even without <code>mysqldump</code> installed, though the external utility may provide more comprehensive backups.
+                    </div>
+
+                    <p>
+                        <strong>Backup file naming:</strong><br>
+                        <code>[database]_[timestamp].sql.gz</code>
+                    </p>
+
+                    <div class="alert alert-secondary">
+                        <i class="bi bi-lightbulb-fill me-2"></i>
+                        <strong>Tip:</strong><br>
+                        You can restore a backup by decompressing the .gz file and running the SQL script.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Backup Modal -->
+    <div class="modal fade" id="createBackupModal" tabindex="-1" aria-labelledby="createBackupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="CreateBackup" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="createBackupModalLabel">Create Database Backup</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="backupDescription" class="form-label">Backup Description (optional)</label>
+                            <input type="text" class="form-control" id="backupDescription" name="Description" placeholder="e.g., Before firmware update">
+                            <div class="form-text">This will help you identify the backup later</div>
+                        </div>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            Creating a backup might take a few moments depending on the database size.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-database-add"></i> Create Backup
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Backup Modal -->
+    <div class="modal fade" id="deleteBackupModal" tabindex="-1" aria-labelledby="deleteBackupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="DeleteBackup" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="backupFileName" name="fileName" value="">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteBackupModalLabel">Delete Backup</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the backup file? This action cannot be undone.</p>
+                        <p><strong>File: </strong><span id="fileNameDisplay"></span></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Delete Backup
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Handle delete backup modal
+        const deleteBackupModal = document.getElementById('deleteBackupModal');
+        deleteBackupModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const backupFile = button.getAttribute('data-backup-file');
+
+            const backupFileNameInput = document.getElementById('backupFileName');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+
+            backupFileNameInput.value = backupFile;
+            fileNameDisplay.textContent = backupFile;
+        });
+    </script>
+}
+
+@functions {
+    string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

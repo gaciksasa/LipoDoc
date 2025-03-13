@@ -215,13 +215,6 @@ namespace DeviceDataCollector.Controllers
             return RedirectToAction(nameof(Network));
         }
 
-        // Method for the Backup settings page (placeholder)
-        public IActionResult Backup()
-        {
-            // This is a placeholder method
-            return View();
-        }
-
         // Helper method to parse a MySQL connection string into components
         private DatabaseConnectionViewModel ParseConnectionString(string connectionString)
         {
@@ -292,6 +285,208 @@ namespace DeviceDataCollector.Controllers
                 len = len / 1024;
             }
             return $"{len:0.##} {sizes[order]}";
+        }
+
+        public async Task<IActionResult> Backup()
+        {
+            var backupService = HttpContext.RequestServices.GetRequiredService<DatabaseBackupService>();
+            var backups = await backupService.GetBackupListAsync();
+
+            // Get scheduled backup settings
+            bool scheduledEnabled = _configuration.GetValue<bool>("DatabaseBackup:Scheduled:Enabled", false);
+            string scheduledTime = _configuration.GetValue<string>("DatabaseBackup:Scheduled:Time", "03:00");
+            int retentionCount = _configuration.GetValue<int>("DatabaseBackup:Scheduled:RetentionCount", 7);
+
+            // Calculate statistics
+            long totalSize = backups.Sum(b => b.FileSize);
+
+            var model = new BackupViewModel
+            {
+                Backups = backups,
+                IsScheduledBackupEnabled = scheduledEnabled,
+                ScheduledBackupTime = scheduledTime,
+                ScheduledBackupRetention = retentionCount,
+                BackupDirectory = Path.Combine(_environment.ContentRootPath, "backups"),
+                TotalBackupSize = totalSize,
+                BackupCount = backups.Count
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateBackup(BackupViewModel model)
+        {
+            var backupService = HttpContext.RequestServices.GetRequiredService<DatabaseBackupService>();
+
+            var result = await backupService.CreateBackupAsync(model.Description);
+
+            if (result.Success)
+            {
+                TempData["SuccessMessage"] = $"Backup created successfully: {result.FileName}";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = $"Backup failed: {result.ErrorMessage}";
+            }
+
+            return RedirectToAction(nameof(Backup));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteBackup(string fileName)
+        {
+            var backupService = HttpContext.RequestServices.GetRequiredService<DatabaseBackupService>();
+
+            bool success = await backupService.DeleteBackupAsync(fileName);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = $"Backup {fileName} deleted successfully";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = $"Failed to delete backup {fileName}";
+            }
+
+            return RedirectToAction(nameof(Backup));
+        }
+
+        public async Task<IActionResult> DownloadBackup(string fileName)
+        {
+            var backupService = HttpContext.RequestServices.GetRequiredService<DatabaseBackupService>();
+
+            string filePath = backupService.GetBackupFilePath(fileName);
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                TempData["ErrorMessage"] = $"Backup file not found: {fileName}";
+                return RedirectToAction(nameof(Backup));
+            }
+
+            var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+
+            return File(fileBytes, "application/gzip", fileName);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateScheduledBackupSettings(ScheduledBackupSettingsViewModel model)
+        {
+            try
+            {
+                string appSettingsPath = Path.Combine(_environment.ContentRootPath, "appsettings.json");
+
+                // Read the current settings
+                string json = await System.IO.File.ReadAllTextAsync(appSettingsPath);
+
+                // Parse JSON
+                using JsonDocument doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Create a new JSON document with updated settings
+                using var ms = new MemoryStream();
+                using var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true });
+
+                writer.WriteStartObject();
+
+                // Copy all properties from the root
+                bool databaseBackupSectionExists = false;
+
+                foreach (var property in root.EnumerateObject())
+                {
+                    writer.WritePropertyName(property.Name);
+
+                    if (property.Name == "DatabaseBackup")
+                    {
+                        databaseBackupSectionExists = true;
+                        writer.WriteStartObject();
+
+                        // Write all properties of DatabaseBackup
+                        var scheduledSectionExists = false;
+
+                        foreach (var backupProp in property.Value.EnumerateObject())
+                        {
+                            writer.WritePropertyName(backupProp.Name);
+
+                            if (backupProp.Name == "Scheduled")
+                            {
+                                scheduledSectionExists = true;
+                                writer.WriteStartObject();
+
+                                // Update the scheduled backup settings
+                                writer.WriteBoolean("Enabled", model.Enabled);
+                                writer.WriteString("Time", model.Time);
+                                writer.WriteNumber("RetentionCount", model.RetentionCount);
+                                writer.WriteNumber("IntervalHours", 24); // Keep default interval
+
+                                writer.WriteEndObject();
+                            }
+                            else
+                            {
+                                backupProp.Value.WriteTo(writer);
+                            }
+                        }
+
+                        // Add Scheduled section if it doesn't exist
+                        if (!scheduledSectionExists)
+                        {
+                            writer.WritePropertyName("Scheduled");
+                            writer.WriteStartObject();
+                            writer.WriteBoolean("Enabled", model.Enabled);
+                            writer.WriteString("Time", model.Time);
+                            writer.WriteNumber("RetentionCount", model.RetentionCount);
+                            writer.WriteNumber("IntervalHours", 24);
+                            writer.WriteEndObject();
+                        }
+
+                        writer.WriteEndObject();
+                    }
+                    else
+                    {
+                        property.Value.WriteTo(writer);
+                    }
+                }
+
+                // Add DatabaseBackup section if it doesn't exist
+                if (!databaseBackupSectionExists)
+                {
+                    writer.WritePropertyName("DatabaseBackup");
+                    writer.WriteStartObject();
+
+                    writer.WritePropertyName("Scheduled");
+                    writer.WriteStartObject();
+                    writer.WriteBoolean("Enabled", model.Enabled);
+                    writer.WriteString("Time", model.Time);
+                    writer.WriteNumber("RetentionCount", model.RetentionCount);
+                    writer.WriteNumber("IntervalHours", 24);
+                    writer.WriteEndObject();
+
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndObject();
+                writer.Flush();
+
+                string newJson = Encoding.UTF8.GetString(ms.ToArray());
+
+                // Write the changes back to the file
+                await System.IO.File.WriteAllTextAsync(appSettingsPath, newJson);
+
+                // Force configuration reload
+                ((IConfigurationRoot)_configuration).Reload();
+
+                TempData["SuccessMessage"] = "Scheduled backup settings updated successfully.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating scheduled backup settings");
+                TempData["ErrorMessage"] = $"Failed to update settings: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Backup));
         }
     }
 
