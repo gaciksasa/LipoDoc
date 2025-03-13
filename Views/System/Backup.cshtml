@@ -4,7 +4,7 @@
 }
 
 <div class="container">
-    <h1 class="mb-4">Settings > Database Backup</h1>
+    <h1 class="mb-4">Settings > Backup</h1>
 
     @if (TempData["SuccessMessage"] != null)
     {
@@ -136,31 +136,35 @@
                         <strong>Backup Location:</strong><br>
                         <code>@Model.BackupDirectory</code>
                     </p>
-
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle-fill me-2"></i>
-                        <strong>How it works:</strong><br>
-                        Backups are created using one of two methods:<br>
-                        1. <code>mysqldump</code> utility (when available)<br>
-                        2. Direct database export using Entity Framework (fallback)
-                    </div>
-
-                    <div class="alert alert-success">
-                        <i class="bi bi-check-circle-fill me-2"></i>
-                        <strong>Compatibility:</strong><br>
-                        The backup system works even without <code>mysqldump</code> installed, though the external utility may provide more comprehensive backups.
-                    </div>
-
                     <p>
                         <strong>Backup file naming:</strong><br>
                         <code>[database]_[timestamp].sql.gz</code>
                     </p>
+                </div>
+            </div>
 
-                    <div class="alert alert-secondary">
-                        <i class="bi bi-lightbulb-fill me-2"></i>
-                        <strong>Tip:</strong><br>
-                        You can restore a backup by decompressing the .gz file and running the SQL script.
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Database Restore</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Warning:</strong><br>
+                        Restoring a backup will completely replace your current database. Always make a new backup before restoring.
                     </div>
+
+                    <p><strong>Restore methods:</strong></p>
+                    <ol>
+                        <li><strong>Automatic restore:</strong> Use the <i class="bi bi-arrow-counterclockwise"></i> button next to any backup</li>
+                        <li>
+                            <strong>Manual restore:</strong> Use these steps with a downloaded backup:
+                            <ul class="mt-2">
+                                <li>Decompress the .gz file: <code>gunzip backup_file.sql.gz</code></li>
+                                <li>Restore with MySQL: <code>mysql -u username -p < backup_file.sql</code></li>
+                            </ul>
+                        </li>
+                    </ol>
                 </div>
             </div>
         </div>
