@@ -1,4 +1,5 @@
-﻿using System;
+﻿// Models/BackupViewModel.cs
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using DeviceDataCollector.Services;

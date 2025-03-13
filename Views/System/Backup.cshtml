@@ -1,6 +1,6 @@
 ﻿@model DeviceDataCollector.Models.BackupViewModel
 @{
-    ViewData["Title"] = "Backup";
+    ViewData["Title"] = "Database Backup";
 }
 
 <div class="container">
@@ -18,6 +18,14 @@
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["WarningMessage"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["WarningMessage"]
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
@@ -55,19 +63,19 @@
                                             <td class="text-end">
                                                 <div class="btn-group" role="group">
                                                     <a asp-action="DownloadBackup" asp-route-fileName="@backup.FileName" class="btn btn-sm btn-info">
-                                                        <i class="bi bi-download"> Download</i>
+                                                        <i class="bi bi-download"></i> Download
                                                     </a>
                                                     <button type="button" class="btn btn-sm btn-success"
                                                             data-bs-toggle="modal"
                                                             data-bs-target="#restoreBackupModal"
                                                             data-backup-file="@backup.FileName">
-                                                        <i class="bi bi-arrow-counterclockwise"> Restore</i>
+                                                        <i class="bi bi-arrow-counterclockwise"></i> Restore
                                                     </button>
                                                     <button type="button" class="btn btn-sm btn-danger"
                                                             data-bs-toggle="modal"
                                                             data-bs-target="#deleteBackupModal"
                                                             data-backup-file="@backup.FileName">
-                                                        <i class="bi bi-trash"> Delete</i>
+                                                        <i class="bi bi-trash"></i> Delete
                                                     </button>
                                                 </div>
                                             </td>
@@ -77,7 +85,7 @@
                                 else
                                 {
                                     <tr>
-                                        <td colspan="6" class="text-center py-3">No backups available</td>
+                                        <td colspan="4" class="text-center py-3">No backups available</td>
                                     </tr>
                                 }
                             </tbody>
@@ -91,7 +99,7 @@
 
             <!-- Scheduled Backup Settings -->
             <div class="card mb-4">
-                <div class="card-header bg-info text-white">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">Scheduled Backup Settings</h5>
                 </div>
                 <div class="card-body">
@@ -99,7 +107,8 @@
                         @Html.AntiForgeryToken()
 
                         <div class="form-check form-switch mb-3">
-                            <input class="form-check-input" type="checkbox" id="enableScheduledBackup" name="Enabled" @(Model.IsScheduledBackupEnabled ? "checked" : "")>
+                            <input class="form-check-input" type="checkbox" id="enableScheduledBackup" name="Enabled" value="true" @(Model.IsScheduledBackupEnabled ? "checked" : "")>
+                            <input type="hidden" name="Enabled" value="false" />
                             <label class="form-check-label" for="enableScheduledBackup">Enable scheduled backups</label>
                         </div>
 
@@ -128,7 +137,7 @@
         <div class="col-lg-4">
             <!-- Information Card -->
             <div class="card mb-4">
-                <div class="card-header bg-secondary text-white">
+                <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">Information</h5>
                 </div>
                 <div class="card-body">
@@ -136,18 +145,12 @@
                         <strong>Backup Location:</strong><br>
                         <code>@Model.BackupDirectory</code>
                     </p>
+
                     <p>
                         <strong>Backup file naming:</strong><br>
                         <code>[database]_[timestamp].sql.gz</code>
                     </p>
-                </div>
-            </div>
 
-            <div class="card mb-4">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">Database Restore</h5>
-                </div>
-                <div class="card-body">
                     <div class="alert alert-warning">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <strong>Warning:</strong><br>
@@ -169,102 +172,102 @@
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Create Backup Modal -->
-    <div class="modal fade" id="createBackupModal" tabindex="-1" aria-labelledby="createBackupModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form asp-action="CreateBackup" method="post">
-                    @Html.AntiForgeryToken()
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="createBackupModalLabel">Create Database Backup</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Create Backup Modal -->
+<div class="modal fade" id="createBackupModal" tabindex="-1" aria-labelledby="createBackupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="CreateBackup" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createBackupModalLabel">Create Database Backup</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="backupDescription" class="form-label">Backup Description (optional)</label>
+                        <input type="text" class="form-control" id="backupDescription" name="Description" placeholder="e.g., Before firmware update">
+                        <div class="form-text">This will help you identify the backup later</div>
                     </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="backupDescription" class="form-label">Backup Description (optional)</label>
-                            <input type="text" class="form-control" id="backupDescription" name="Description" placeholder="e.g., Before firmware update">
-                            <div class="form-text">This will help you identify the backup later</div>
-                        </div>
-                        <div class="alert alert-warning">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        Creating a backup might take a few moments depending on the database size.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-database-add"></i> Create Backup
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Backup Modal -->
+<div class="modal fade" id="deleteBackupModal" tabindex="-1" aria-labelledby="deleteBackupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="DeleteBackup" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="backupFileName" name="fileName" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteBackupModalLabel">Delete Backup</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the backup file? This action cannot be undone.</p>
+                    <p><strong>File: </strong><span id="fileNameDisplay"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Delete Backup
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Restore Backup Modal -->
+<div class="modal fade" id="restoreBackupModal" tabindex="-1" aria-labelledby="restoreBackupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="RestoreBackup" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="restoreBackupFileName" name="fileName" value="">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="restoreBackupModalLabel">Restore Database</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>WARNING:</strong> This will completely replace your current database with the data from this backup.
+                        This action cannot be undone!
+                    </div>
+
+                    <p>Are you absolutely sure you want to restore from this backup?</p>
+                    <p><strong>File: </strong><span id="restoreFileNameDisplay"></span></p>
+
+                    @if (TempData["RestoreFileName"] != null)
+                    {
+                        <div class="alert alert-info">
                             <i class="bi bi-info-circle-fill me-2"></i>
-                            Creating a backup might take a few moments depending on the database size.
+                            Please confirm restore of <strong>@TempData["RestoreFileName"]</strong>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-database-add"></i> Create Backup
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Backup Modal -->
-    <div class="modal fade" id="deleteBackupModal" tabindex="-1" aria-labelledby="deleteBackupModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form asp-action="DeleteBackup" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" id="backupFileName" name="fileName" value="">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="deleteBackupModalLabel">Delete Backup</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Are you sure you want to delete the backup file? This action cannot be undone.</p>
-                        <p><strong>File: </strong><span id="fileNameDisplay"></span></p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Delete Backup
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Restore Backup Modal -->
-    <div class="modal fade" id="restoreBackupModal" tabindex="-1" aria-labelledby="restoreBackupModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form asp-action="RestoreBackup" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" id="restoreBackupFileName" name="fileName" value="">
-                    <div class="modal-header bg-warning">
-                        <h5 class="modal-title" id="restoreBackupModalLabel">Restore Database</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-danger">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            <strong>WARNING:</strong> This will completely replace your current database with the data from this backup.
-                            This action cannot be undone!
-                        </div>
-
-                        <p>Are you absolutely sure you want to restore from this backup?</p>
-                        <p><strong>File: </strong><span id="restoreFileNameDisplay"></span></p>
-
-                        @if (TempData["RestoreFileName"] != null)
-                        {
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle-fill me-2"></i>
-                                Please confirm restore of <strong>@TempData["RestoreFileName"]</strong>
-                            </div>
-                        }
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-arrow-counterclockwise"></i> Restore Database
-                        </button>
-                    </div>
-                </form>
-            </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-arrow-counterclockwise"></i> Restore Database
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -301,18 +304,29 @@
         @if (TempData["RestoreFileName"] != null)
         {
             <text>
-                document.addEventListener('DOMContentLoaded', function() {
-                    // Set the file name and display
-                    const fileName = '@TempData["RestoreFileName"]';
-                    document.getElementById('restoreBackupFileName').value = fileName;
-                    document.getElementById('restoreFileNameDisplay').textContent = fileName;
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Set the file name and display
+                        const fileName = '@TempData["RestoreFileName"]';
+                        document.getElementById('restoreBackupFileName').value = fileName;
+                        document.getElementById('restoreFileNameDisplay').textContent = fileName;
 
-                    // Show the modal
-                    const restoreModal = new bootstrap.Modal(document.getElementById('restoreBackupModal'));
-                    restoreModal.show();
-                });
+                        // Show the modal
+                        const restoreModal = new bootstrap.Modal(document.getElementById('restoreBackupModal'));
+                        restoreModal.show();
+                    });
             </text>
         }
+
+        // Log checkbox state for debugging
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkbox = document.getElementById('enableScheduledBackup');
+            console.log('Initial checkbox state:', checkbox.checked);
+
+            // Log checkbox changes
+            checkbox.addEventListener('change', function() {
+                console.log('Checkbox changed to:', this.checked);
+            });
+        });
     </script>
 }
 

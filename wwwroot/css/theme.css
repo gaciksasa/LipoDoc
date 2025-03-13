@@ -126,6 +126,14 @@ body {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
+[data-bs-theme="light"] .accordion-button {
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .accordion-button {
+    color: var(--nav-text);
+}
+
 .footer {
     background-color: var(--footer-bg);
     border-color: var(--bs-border-color);
@@ -493,7 +501,7 @@ thead {
 
 .accordion-button:not(.collapsed) {
     background-color: transparent;
-    color: var(--bs-body-color);
+    /* color: var(--bs-body-color); */
     box-shadow: none;
 }
 

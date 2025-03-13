@@ -297,6 +297,9 @@ namespace DeviceDataCollector.Controllers
             string scheduledTime = _configuration.GetValue<string>("DatabaseBackup:Scheduled:Time", "03:00");
             int retentionCount = _configuration.GetValue<int>("DatabaseBackup:Scheduled:RetentionCount", 7);
 
+            // Log the configuration for debugging
+            _logger.LogInformation($"Scheduled backup enabled from config: {scheduledEnabled}");
+
             // Calculate statistics
             long totalSize = backups.Sum(b => b.FileSize);
 
@@ -477,6 +480,15 @@ namespace DeviceDataCollector.Controllers
 
                 // Force configuration reload
                 ((IConfigurationRoot)_configuration).Reload();
+
+                // If we have a service instance in DI, reload its configuration too
+                var scheduledService = HttpContext.RequestServices.GetService<ScheduledBackupService>();
+                if (scheduledService != null)
+                {
+                    scheduledService.ReloadConfiguration();
+                    scheduledService.NotifyConfigurationChanged();
+                    _logger.LogInformation("Notified scheduled backup service of configuration changes");
+                }
 
                 TempData["SuccessMessage"] = "Scheduled backup settings updated successfully.";
             }

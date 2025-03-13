@@ -12,10 +12,11 @@ namespace DeviceDataCollector.Services
     {
         private readonly ILogger<ScheduledBackupService> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly TimeSpan _interval;
-        private readonly int _retention;
-        private readonly bool _enabled;
-        private readonly string _scheduledTime;
+        private readonly IConfiguration _configuration;
+        private TimeSpan _interval;
+        private int _retention;
+        private bool _enabled;
+        private string _scheduledTime;
 
         public ScheduledBackupService(
             ILogger<ScheduledBackupService> logger,
@@ -24,47 +25,92 @@ namespace DeviceDataCollector.Services
         {
             _logger = logger;
             _scopeFactory = scopeFactory;
+            _configuration = configuration;
 
+            // Load configuration
+            ReloadConfiguration();
+        }
+
+        public void ReloadConfiguration()
+        {
             // Get config values with defaults
-            _enabled = configuration.GetValue<bool>("DatabaseBackup:Scheduled:Enabled", false);
-            _interval = TimeSpan.FromHours(configuration.GetValue<int>("DatabaseBackup:Scheduled:IntervalHours", 24));
-            _retention = configuration.GetValue<int>("DatabaseBackup:Scheduled:RetentionCount", 7);
-            _scheduledTime = configuration.GetValue<string>("DatabaseBackup:Scheduled:Time", "03:00");
+            _enabled = _configuration.GetValue<bool>("DatabaseBackup:Scheduled:Enabled", false);
+            _interval = TimeSpan.FromHours(_configuration.GetValue<int>("DatabaseBackup:Scheduled:IntervalHours", 24));
+            _retention = _configuration.GetValue<int>("DatabaseBackup:Scheduled:RetentionCount", 7);
+            _scheduledTime = _configuration.GetValue<string>("DatabaseBackup:Scheduled:Time", "03:00");
 
-            _logger.LogInformation($"Scheduled backup service configured with: Enabled={_enabled}, Interval={_interval.TotalHours}h, Retention={_retention}, Time={_scheduledTime}");
+            _logger.LogInformation($"Scheduled backup service configuration loaded: Enabled={_enabled}, Interval={_interval.TotalHours}h, Retention={_retention}, Time={_scheduledTime}");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (!_enabled)
-            {
-                _logger.LogInformation("Scheduled backup service is disabled");
-                return;
-            }
-
             _logger.LogInformation("Scheduled backup service is starting...");
 
             try
             {
                 while (!stoppingToken.IsCancellationRequested)
                 {
+                    // Reload configuration in case it changed
+                    ReloadConfiguration();
+
+                    if (!_enabled)
+                    {
+                        _logger.LogInformation("Scheduled backup service is disabled. Waiting for configuration changes...");
+
+                        // Create a linked token source that combines the stopping token and our config change token
+                        using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                            stoppingToken, _configChangeTokenSource.Token);
+
+                        try
+                        {
+                            // Wait for either the application to stop or a config change
+                            await Task.Delay(TimeSpan.FromMinutes(5), linkedTokenSource.Token);
+                        }
+                        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+                        {
+                            // If we get here, it's because of a config change, not app shutdown
+                            _logger.LogInformation("Waking up to check for configuration changes");
+                        }
+                        continue;
+                    }
+
                     // Calculate time until next backup
                     var delay = CalculateTimeUntilNextBackup();
-                    _logger.LogInformation($"Next scheduled backup in {delay.TotalHours:F1} hours");
+                    _logger.LogInformation($"Next scheduled backup in {delay.TotalHours:F1} hours at {DateTime.Now.Add(delay).ToString("HH:mm:ss dd-MM-yyyy")}");
 
-                    // Wait until next backup time
-                    await Task.Delay(delay, stoppingToken);
+                    // Wait until next backup time or until configuration changes
+                    try
+                    {
+                        // Create a linked token source that combines the stopping token and our config change token
+                        using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                            stoppingToken, _configChangeTokenSource.Token);
 
-                    // Perform the backup
-                    await RunBackupAsync();
+                        await Task.Delay(delay, linkedTokenSource.Token);
+                    }
+                    catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+                    {
+                        // If we get here, it's because of a config change, not app shutdown
+                        _logger.LogInformation("Schedule interrupted due to configuration change");
+                        continue; // Skip to next loop iteration to recalculate
+                    }
 
-                    // Cleanup old backups
-                    await CleanupOldBackupsAsync();
+                    // Reload configuration again before performing backup
+                    ReloadConfiguration();
+
+                    if (_enabled)
+                    {
+                        // Perform the backup
+                        await RunBackupAsync();
+
+                        // Cleanup old backups
+                        await CleanupOldBackupsAsync();
+                    }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 // This is expected when stopping
+                _logger.LogInformation("Scheduled backup service is being stopped");
             }
             catch (Exception ex)
             {
@@ -73,6 +119,7 @@ namespace DeviceDataCollector.Services
             finally
             {
                 _logger.LogInformation("Scheduled backup service is stopping...");
+                _configChangeTokenSource.Dispose();
             }
         }
 
@@ -147,6 +194,27 @@ namespace DeviceDataCollector.Services
             }
 
             return scheduledToday - now;
+        }
+
+        private CancellationTokenSource _configChangeTokenSource = new CancellationTokenSource();
+
+        public void NotifyConfigurationChanged()
+        {
+            _logger.LogInformation("Configuration change notification received, resetting schedule...");
+
+            // Cancel the current waiting operation to force a recalculation
+            var oldTokenSource = _configChangeTokenSource;
+            _configChangeTokenSource = new CancellationTokenSource();
+
+            try
+            {
+                oldTokenSource.Cancel();
+                oldTokenSource.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error canceling previous token");
+            }
         }
     }
 }
