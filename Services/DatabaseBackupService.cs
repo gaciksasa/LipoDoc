@@ -481,6 +481,192 @@ namespace DeviceDataCollector.Services
                 return null;
             }
         }
+
+        public async Task<(bool Success, string ErrorMessage)> RestoreBackupAsync(string fileName)
+        {
+            try
+            {
+                string filePath = Path.Combine(_backupDirectory, fileName);
+
+                if (!File.Exists(filePath))
+                {
+                    return (false, $"Backup file not found: {fileName}");
+                }
+
+                _logger.LogInformation($"Starting restore of backup: {fileName}");
+
+                // Create temporary decompressed file
+                string tempSqlFilePath = Path.Combine(_backupDirectory, Path.GetFileNameWithoutExtension(fileName));
+
+                // Decompress the .gz file
+                using (var compressedFileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                using (var gzipStream = new GZipStream(compressedFileStream, CompressionMode.Decompress))
+                using (var outputFileStream = new FileStream(tempSqlFilePath, FileMode.Create, FileAccess.Write))
+                {
+                    await gzipStream.CopyToAsync(outputFileStream);
+                }
+
+                _logger.LogInformation($"Successfully decompressed backup file to: {tempSqlFilePath}");
+
+                // Parse connection string
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                var connectionParams = ParseConnectionString(connectionString);
+
+                if (connectionParams == null)
+                {
+                    // Clean up temp file
+                    File.Delete(tempSqlFilePath);
+                    return (false, "Invalid connection string");
+                }
+
+                // Execute the SQL file using mysql command line
+                bool success = await ExecuteMySqlRestoreAsync(
+                    connectionParams.Server,
+                    connectionParams.Port,
+                    connectionParams.Username,
+                    connectionParams.Password,
+                    tempSqlFilePath);
+
+                // Clean up temp file regardless of outcome
+                File.Delete(tempSqlFilePath);
+
+                if (!success)
+                {
+                    return (false, "Restore command failed. See logs for details.");
+                }
+
+                _logger.LogInformation($"Successfully restored backup: {fileName}");
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error restoring backup: {fileName}");
+                return (false, ex.Message);
+            }
+        }
+
+        private async Task<bool> ExecuteMySqlRestoreAsync(string server, int port, string username, string password, string sqlFilePath)
+        {
+            try
+            {
+                // First try using mysql client
+                bool mysqlAvailable = false;
+                try
+                {
+                    using var checkProcess = new Process();
+                    checkProcess.StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "mysql",
+                        Arguments = "--version",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+
+                    mysqlAvailable = checkProcess.Start();
+                }
+                catch
+                {
+                    _logger.LogWarning("mysql command not found, falling back to EF Core execution");
+                    mysqlAvailable = false;
+                }
+
+                if (mysqlAvailable)
+                {
+                    // Use mysql client to restore
+                    using var process = new Process();
+                    process.StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "mysql",
+                        Arguments = $"--host={server} --port={port} --user={username} --password={password}",
+                        RedirectStandardInput = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+
+                    _logger.LogInformation($"Starting mysql restore using command line client");
+                    process.Start();
+
+                    // Read the SQL file and send it to mysql via stdin
+                    string sqlScript = await File.ReadAllTextAsync(sqlFilePath);
+                    await process.StandardInput.WriteAsync(sqlScript);
+                    process.StandardInput.Close();
+
+                    // Check for errors
+                    string error = await process.StandardError.ReadToEndAsync();
+                    if (!string.IsNullOrEmpty(error) && !error.Contains("Warning"))
+                    {
+                        _logger.LogError($"mysql restore error: {error}");
+                        return false;
+                    }
+
+                    await process.WaitForExitAsync();
+                    return process.ExitCode == 0;
+                }
+                else
+                {
+                    // Fallback to Entity Framework Core for execution
+                    _logger.LogInformation($"Restoring backup using Entity Framework Core");
+
+                    // Parse the SQL script
+                    string sqlScript = await File.ReadAllTextAsync(sqlFilePath);
+
+                    // Create a connection string without specifying the database
+                    var connectionString = $"server={server};port={port};user={username};password={password}";
+                    var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+                    optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+
+                    using var dbContext = new ApplicationDbContext(optionsBuilder.Options);
+
+                    // Split the script by semicolons to get individual statements
+                    // This is a simplified approach and may not work for all cases
+                    var statements = sqlScript.Split(';')
+                        .Where(s => !string.IsNullOrWhiteSpace(s))
+                        .Select(s => s.Trim() + ";");
+
+                    dbContext.Database.OpenConnection();
+
+                    // Execute each statement
+                    foreach (var stmt in statements)
+                    {
+                        // Skip comments and certain statements that EF Core can't handle directly
+                        if (stmt.TrimStart().StartsWith("--") ||
+                            stmt.Contains("DEFINER") ||
+                            stmt.TrimStart().StartsWith("/*!"))
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            using var command = dbContext.Database.GetDbConnection().CreateCommand();
+                            command.CommandText = stmt;
+                            command.CommandTimeout = 300; // 5 minutes
+
+                            await command.ExecuteNonQueryAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Error executing SQL statement: {stmt.Substring(0, Math.Min(100, stmt.Length))}");
+                            // Continue with next statement - some errors are expected
+                        }
+                    }
+
+                    dbContext.Database.CloseConnection();
+
+                    _logger.LogInformation("Completed EF Core restore");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing MySQL restore");
+                return false;
+            }
+        }
     }
 
     public class ConnectionParameters

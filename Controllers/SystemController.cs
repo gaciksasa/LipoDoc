@@ -488,6 +488,42 @@ namespace DeviceDataCollector.Controllers
 
             return RedirectToAction(nameof(Backup));
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RestoreBackup(string fileName)
+        {
+            // Add a confirmation step for safety
+            string confirmKey = $"restore_{fileName}";
+
+            // Check if this is a confirmed restore
+            if (TempData[confirmKey] == null)
+            {
+                // First request - store confirmation key in TempData and show confirmation page
+                TempData[confirmKey] = true;
+                TempData["RestoreFileName"] = fileName;
+                TempData["WarningMessage"] = "Please confirm that you want to restore this backup. This will OVERWRITE your current database!";
+                return RedirectToAction(nameof(Backup));
+            }
+
+            // This is a confirmed restore - clear the confirmation flag
+            TempData.Remove(confirmKey);
+
+            var backupService = HttpContext.RequestServices.GetRequiredService<DatabaseBackupService>();
+
+            var result = await backupService.RestoreBackupAsync(fileName);
+
+            if (result.Success)
+            {
+                TempData["SuccessMessage"] = "Database restored successfully from backup. You may need to restart the application.";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = $"Error restoring database: {result.ErrorMessage}";
+            }
+
+            return RedirectToAction(nameof(Backup));
+        }
     }
 
     // NetworkViewModel remains in this file as it's only used here
