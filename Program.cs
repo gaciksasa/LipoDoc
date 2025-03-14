@@ -56,6 +56,7 @@ builder.Services.AddScoped<DatabaseBackupService>(provider =>
         provider.GetRequiredService<IWebHostEnvironment>()));
 builder.Services.AddSingleton<ScheduledBackupService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<ScheduledBackupService>());
+builder.Services.AddSingleton<ApplicationLifetimeService>();
 
 var app = builder.Build();
 
