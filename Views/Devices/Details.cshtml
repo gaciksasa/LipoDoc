@@ -110,11 +110,11 @@
                     <div class="d-flex justify-content-between">
                         <a asp-action="Index" class="btn btn-secondary">Back to List</a>
                         <div>
-                            <a asp-action="Donations" asp-route-id="@Model.Id" class="btn btn-primary">
-                                <i class="bi bi-droplet"></i> View Donations
-                            </a>
                             @if (User.IsInRole("Admin"))
                             {
+                                <a asp-controller="DeviceConfiguration" asp-action="Configure" asp-route-id="@Model.Id" class="btn btn-info">
+                                    <i class="bi bi-gear"></i> Configure
+                                </a>
                                 <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>

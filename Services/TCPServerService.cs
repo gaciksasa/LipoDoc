@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace DeviceDataCollector.Services
 {
@@ -30,6 +31,16 @@ namespace DeviceDataCollector.Services
         private const char STAR_SEPARATOR = '\u002A'; // Unicode 42 - Star separator (*)
         private const char LINE_FEED = '\u000A'; // Unicode 10 - Line Feed character
 
+        private readonly Dictionary<string, Queue<PendingCommand>> _pendingCommands = new Dictionary<string, Queue<PendingCommand>>();
+        private readonly object _pendingCommandsLock = new object();
+
+        public class PendingCommand
+        {
+            public string Command { get; set; }
+            public TaskCompletionSource<string> ResponseTask { get; set; }
+            public DateTime CreatedAt { get; set; } = DateTime.Now;
+            public string ResponsePrefix { get; set; }
+        }
 
         public TCPServerService(
             ILogger<TCPServerService> logger,
@@ -188,6 +199,12 @@ namespace DeviceDataCollector.Services
                             await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
                             _logger.LogInformation($"Sent acknowledgment for duplicate Data message from {clientIP}:{clientPort}");
                         }
+                    }
+
+                    string deviceId = ExtractDeviceIdFromMessage(data);
+                    if (!string.IsNullOrEmpty(deviceId))
+                    {
+                        await ProcessPendingCommandsAsync(stream, deviceId, isNewMessage);
                     }
                 }
             }
@@ -485,6 +502,154 @@ namespace DeviceDataCollector.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error sending acknowledgment to client {clientIP}");
+            }
+        }
+
+        public Task<string> QueueCommandAsync(string deviceId, string command, string expectedResponsePrefix, int timeoutMilliseconds = 10000)
+        {
+            _logger.LogInformation($"Queuing command for device {deviceId}: {command}");
+
+            var responseTask = new TaskCompletionSource<string>();
+            var pendingCommand = new PendingCommand
+            {
+                Command = command,
+                ResponseTask = responseTask,
+                ResponsePrefix = expectedResponsePrefix
+            };
+
+            lock (_pendingCommandsLock)
+            {
+                if (!_pendingCommands.ContainsKey(deviceId))
+                {
+                    _pendingCommands[deviceId] = new Queue<PendingCommand>();
+                }
+
+                _pendingCommands[deviceId].Enqueue(pendingCommand);
+            }
+
+            // Set up a timeout
+            Task.Delay(timeoutMilliseconds).ContinueWith(t =>
+            {
+                // Check if the task is still pending when the timeout occurs
+                lock (_pendingCommandsLock)
+                {
+                    if (_pendingCommands.TryGetValue(deviceId, out var queue))
+                    {
+                        if (queue.Any(cmd => cmd.ResponseTask == responseTask && !cmd.ResponseTask.Task.IsCompleted))
+                        {
+                            _logger.LogWarning($"Command timed out for device {deviceId}");
+                            responseTask.TrySetException(new TimeoutException($"Command timed out for device {deviceId}"));
+                        }
+                    }
+                }
+            });
+
+            return responseTask.Task;
+        }
+
+        private async Task ProcessPendingCommandsAsync(NetworkStream stream, string deviceId, bool allowCommand)
+        {
+            if (!allowCommand)
+            {
+                // Only process commands for new messages to avoid duplicate processing
+                return;
+            }
+
+            PendingCommand pendingCommand = null;
+
+            lock (_pendingCommandsLock)
+            {
+                if (_pendingCommands.TryGetValue(deviceId, out var commandQueue) && commandQueue.Count > 0)
+                {
+                    pendingCommand = commandQueue.Peek(); // Just peek, we'll dequeue after successful processing
+                }
+            }
+
+            if (pendingCommand == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _logger.LogInformation($"Processing pending command for device {deviceId}: {pendingCommand.Command}");
+
+                // Send the command
+                byte[] commandBytes = Encoding.ASCII.GetBytes(pendingCommand.Command);
+                await stream.WriteAsync(commandBytes, 0, commandBytes.Length);
+
+                // Wait for the response
+                byte[] responseBuffer = new byte[8192];
+                int bytesRead = await stream.ReadAsync(responseBuffer, 0, responseBuffer.Length);
+                string response = Encoding.ASCII.GetString(responseBuffer, 0, bytesRead);
+
+                _logger.LogInformation($"Received response from {deviceId}: {response.Substring(0, Math.Min(100, response.Length))}...");
+
+                // Check if the response starts with the expected prefix
+                if (string.IsNullOrEmpty(pendingCommand.ResponsePrefix) || response.StartsWith(pendingCommand.ResponsePrefix))
+                {
+                    // Dequeue the command and complete the task with the response
+                    lock (_pendingCommandsLock)
+                    {
+                        if (_pendingCommands.TryGetValue(deviceId, out var commandQueue) && commandQueue.Count > 0)
+                        {
+                            // Make sure it's still the same command
+                            if (commandQueue.Peek() == pendingCommand)
+                            {
+                                commandQueue.Dequeue();
+                            }
+                        }
+                    }
+
+                    pendingCommand.ResponseTask.TrySetResult(response);
+                    _logger.LogInformation($"Command processed successfully for device {deviceId}");
+                }
+                else
+                {
+                    _logger.LogWarning($"Unexpected response prefix for device {deviceId}. Expected: {pendingCommand.ResponsePrefix}, Got: {response.Substring(0, Math.Min(10, response.Length))}...");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing command for device {deviceId}");
+
+                // Remove the failed command
+                lock (_pendingCommandsLock)
+                {
+                    if (_pendingCommands.TryGetValue(deviceId, out var commandQueue) && commandQueue.Count > 0)
+                    {
+                        if (commandQueue.Peek() == pendingCommand)
+                        {
+                            commandQueue.Dequeue();
+                        }
+                    }
+                }
+
+                pendingCommand.ResponseTask.TrySetException(ex);
+            }
+        }
+
+        private string ExtractDeviceIdFromMessage(string message)
+        {
+            try
+            {
+                // Handle various separator characters
+                char[] possibleSeparators = { SEPARATOR, QUESTION_SEPARATOR, PIPE_SEPARATOR, STAR_SEPARATOR };
+
+                foreach (var separator in possibleSeparators)
+                {
+                    var parts = message.Split(separator);
+                    if (parts.Length > 1)
+                    {
+                        return parts[1]; // Device ID is typically the second part
+                    }
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
             }
         }
     }
