@@ -12,15 +12,43 @@
                     <h5 class="mb-0">Edit Device</h5>
                 </div>
                 <div class="card-body">
+                    @if (TempData["CommandResponse"] != null)
+                    {
+                        <div class="alert alert-info mb-3">
+                            <h6>Server Response:</h6>
+                            <pre class="mb-0"><code>@TempData["CommandResponse"]</code></pre>
+                        </div>
+                    }
+
+                    @if (TempData["SuccessMessage"] != null)
+                    {
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+                        </div>
+                    }
+
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger mb-3">
+                            <i class="bi bi-exclamation-triangle"></i> @TempData["ErrorMessage"]
+                        </div>
+                    }
+
                     <form asp-action="Edit">
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         <input type="hidden" asp-for="Id" />
 
                         <div class="mb-3">
-                            <label asp-for="SerialNumber" class="form-label">Serial Number</label>
+                            <label asp-for="SerialNumber" class="form-label">Current Serial Number</label>
                             <input asp-for="SerialNumber" class="form-control" readonly />
                             <span asp-validation-for="SerialNumber" class="text-danger"></span>
-                            <div class="form-text">Serial number cannot be changed</div>
+                            <div class="form-text">Current serial number cannot be changed directly</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="NewSerialNumber" class="form-label">New Serial Number</label>
+                            <input name="NewSerialNumber" id="NewSerialNumber" class="form-control" />
+                            <div class="form-text">Enter a new serial number to update the device via the TCP server</div>
                         </div>
 
                         <div class="mb-3">
@@ -49,6 +77,17 @@
                             <textarea asp-for="Notes" class="form-control" rows="3"></textarea>
                             <span asp-validation-for="Notes" class="text-danger"></span>
                             <div class="form-text">Additional notes about this device</div>
+                        </div>
+
+                        <div class="alert alert-info mb-3">
+                            <p><strong>Serial Number Update Process:</strong></p>
+                            <p>Clicking "Save Changes" with a new serial number will:</p>
+                            <ol>
+                                <li>Send update command to TCP server on port 5000</li>
+                                <li>Format: <code>#iª@Model.SerialNumberª[New Serial Number]ª77ý</code></li>
+                                <li>Wait for confirmation from the device</li>
+                                <li>Update database only on successful confirmation</li>
+                            </ol>
                         </div>
 
                         <div class="d-flex justify-content-between">

@@ -19,7 +19,8 @@ namespace DeviceDataCollector.Services
             DataMessage,      // #D
             RequestMessage,   // #u
             AcknowledgeMessage, // #A
-            NoMoreDataMessage, // #U
+            NoMoreDataMessage,  // #U
+            SerialUpdateResponseMessage, // #I 
             Unknown
         }
 
@@ -80,6 +81,16 @@ namespace DeviceDataCollector.Services
                         _logger.LogInformation($"No more data message received: {message}");
                         return null; // We don't store these messages
 
+                    case MessageType.SerialUpdateResponseMessage:
+                        _logger.LogInformation($"Serial number update response received: {message}");
+                        // Parse the response and validate it
+                        var responseResult = ParseSerialUpdateResponse(message);
+                        if (responseResult != null)
+                        {
+                            _logger.LogInformation($"Parsed serial update response: OldSN={responseResult.OldSerialNumber}, NewSN={responseResult.NewSerialNumber}, Status={responseResult.Status}");
+                        }
+                        return responseResult;
+
                     default:
                         _logger.LogWarning($"Unknown message format received: {message}");
                         return null;
@@ -114,6 +125,8 @@ namespace DeviceDataCollector.Services
                 return MessageType.AcknowledgeMessage;
             else if (message.StartsWith("#U"))
                 return MessageType.NoMoreDataMessage;
+            else if (message.StartsWith("#I"))
+                return MessageType.SerialUpdateResponseMessage;
             else
                 return MessageType.Unknown;
         }
@@ -320,6 +333,52 @@ namespace DeviceDataCollector.Services
             }
 
             return DateTime.Now; // Default to current local time if parsing fails
+        }
+
+
+        private SerialUpdateResponse ParseSerialUpdateResponse(string message)
+        {
+            // Format: #IªOldSNªNewSNªOKª77ý
+            var parts = message.Split('ª');
+
+            _logger.LogDebug($"Serial update response parts count: {parts.Length}, parts: {string.Join(", ", parts)}");
+
+            if (parts.Length < 4)
+            {
+                _logger.LogWarning($"Invalid serial update response format (not enough parts): {message}");
+                return null;
+            }
+
+            try
+            {
+                var response = new SerialUpdateResponse
+                {
+                    OldSerialNumber = parts[1],
+                    NewSerialNumber = parts[2],
+                    Status = parts[3],
+                    CheckSum = parts.Length > 4 ? parts[4].TrimEnd('\u00FD') : null,
+                    Timestamp = DateTime.Now
+                };
+
+                _logger.LogInformation($"Parsed serial update response: Old={response.OldSerialNumber}, New={response.NewSerialNumber}, Status={response.Status}");
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error parsing serial update response: {message}");
+                return null;
+            }
+        }
+
+        public class SerialUpdateResponse
+        {
+            public string OldSerialNumber { get; set; }
+            public string NewSerialNumber { get; set; }
+            public string Status { get; set; }
+            public string CheckSum { get; set; }
+            public string IPAddress { get; set; }
+            public int Port { get; set; }
+            public DateTime Timestamp { get; set; }
         }
     }
 }

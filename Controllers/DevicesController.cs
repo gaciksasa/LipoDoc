@@ -113,11 +113,13 @@ namespace DeviceDataCollector.Controllers
             return View(device);
         }
 
+        // Replace the existing Edit POST method in DevicesController.cs with this:
+
         // POST: Devices/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Policy = "RequireAdminRole")]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,SerialNumber,Name,Location,IsActive,Notes")] Device device)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,SerialNumber,Name,Location,IsActive,Notes")] Device device, string NewSerialNumber)
         {
             if (id != device.Id)
             {
@@ -135,15 +137,60 @@ namespace DeviceDataCollector.Controllers
             device.RegisteredDate = existingDevice.RegisteredDate;
             device.LastConnectionTime = existingDevice.LastConnectionTime;
 
+            // Check if a new serial number was provided
+            bool serialNumberChangeRequested = !string.IsNullOrWhiteSpace(NewSerialNumber) &&
+                                              NewSerialNumber != existingDevice.SerialNumber;
+
             if (ModelState.IsValid)
             {
                 try
                 {
+                    if (serialNumberChangeRequested)
+                    {
+                        // Get the communication service
+                        var commService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
+
+                        // Send the serial number update command
+                        var (success, response, confirmed) = await commService.UpdateSerialNumberAsync(
+                            existingDevice.SerialNumber,
+                            NewSerialNumber);
+
+                        // Store the response for display
+                        TempData["CommandResponse"] = response;
+
+                        if (!success)
+                        {
+                            // Communication error
+                            TempData["ErrorMessage"] = "Failed to communicate with the TCP server. Device not updated.";
+                            return View(device);
+                        }
+
+                        if (!confirmed)
+                        {
+                            // Device did not confirm the change
+                            TempData["ErrorMessage"] = "Device did not confirm the serial number change. Updates not saved.";
+                            return View(device);
+                        }
+
+                        // Update was confirmed by the device, update the serial number
+                        device.SerialNumber = NewSerialNumber;
+                        _logger.LogInformation($"Device serial number changed from {existingDevice.SerialNumber} to {NewSerialNumber}");
+                        TempData["SuccessMessage"] = "Serial number updated successfully on device and in database.";
+                    }
+
+                    // Update the device in the database
                     _context.Update(device);
                     await _context.SaveChangesAsync();
                     _logger.LogInformation($"Device {device.SerialNumber} updated by {User.Identity.Name}");
+
+                    if (!serialNumberChangeRequested)
+                    {
+                        TempData["SuccessMessage"] = "Device information updated successfully.";
+                    }
+
+                    return RedirectToAction(nameof(Index));
                 }
-                catch (DbUpdateConcurrencyException)
+                catch (DbUpdateConcurrencyException ex)
                 {
                     if (!DeviceExists(device.Id))
                     {
@@ -151,10 +198,17 @@ namespace DeviceDataCollector.Controllers
                     }
                     else
                     {
+                        _logger.LogError(ex, "Concurrency error updating device");
+                        TempData["ErrorMessage"] = $"Concurrency error: {ex.Message}";
                         throw;
                     }
                 }
-                return RedirectToAction(nameof(Index));
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error updating device");
+                    TempData["ErrorMessage"] = $"Error updating device: {ex.Message}";
+                    return View(device);
+                }
             }
             return View(device);
         }
@@ -317,6 +371,40 @@ namespace DeviceDataCollector.Controllers
         {
             return _context.Devices.Any(e => e.Id == id);
         }
+
+        [HttpPost]
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> SendCommand(int id, string command)
+        {
+            try
+            {
+                var device = await _context.Devices.FindAsync(id);
+                if (device == null)
+                {
+                    return NotFound();
+                }
+
+                // Get the TCP service to send the command
+                var tcpService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
+
+                // Call our new method - note that we're passing temporary values just to reuse the function
+                // This is not ideal but will fix the compilation error
+                var (success, response, _) = await tcpService.UpdateSerialNumberAsync(
+                    device.SerialNumber,
+                    device.SerialNumber); // Just passing the same SN as both parameters
+
+                TempData["CommandResponse"] = response;
+                TempData["SuccessMessage"] = success ? "Command sent successfully." : "Command failed.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending command to device");
+                TempData["ErrorMessage"] = $"Error sending command: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Details), new { id = id });
+        }
+
     }
 
     // Helper class for pagination

@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using static DeviceDataCollector.Services.DeviceMessageParser;
 
 namespace DeviceDataCollector.Services
 {
@@ -40,13 +41,13 @@ namespace DeviceDataCollector.Services
             _scopeFactory = scopeFactory;
 
             _port = configuration.GetValue<int>("TCPServer:Port", 5000);
-            _ipAddress = configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.2") ?? string.Empty;
+            _ipAddress = configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.1") ?? string.Empty;
 
             // List of IP addresses that are part of our application and shouldn't store data
             _appIpAddresses = new HashSet<string> {
                 "127.0.0.1",
                 "127.0.0.2",
-                "192.168.1.124",
+                "192.168.1.130",
                 "::1",
                 "localhost"
             };
@@ -177,6 +178,33 @@ namespace DeviceDataCollector.Services
                             // For #S messages, we process but don't send a response
                             _logger.LogInformation($"Received Status message from {clientIP}:{clientPort}. No response needed.");
                         }
+                        else if (messageType == "SerialUpdateRequest")
+                        {
+                            _logger.LogInformation($"Received serial number update request from {clientIP}:{clientPort}");
+
+                            // Parse the message to extract current and new serial numbers
+                            string[] parts = data.Split('\u00AA');
+                            if (parts.Length >= 3)
+                            {
+                                string currentSerialNumber = parts[1];
+                                string newSerialNumber = parts[2];
+
+                                _logger.LogInformation($"Processing serial number update request: {currentSerialNumber} -> {newSerialNumber}");
+
+                                // Generate a response message: #IªOldSNªNewSNªOKª77ý
+                                string responseMessage = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAOK\u00AA77\u00FD";
+                                byte[] responseBytes = Encoding.ASCII.GetBytes(responseMessage);
+
+                                // Send the response
+                                await stream.WriteAsync(responseBytes, 0, responseBytes.Length, stoppingToken);
+
+                                _logger.LogInformation($"Sent serial number update response: {responseMessage}");
+                            }
+                            else
+                            {
+                                _logger.LogWarning($"Invalid serial update request format: {data}");
+                            }
+                        }
                     }
                     else
                     {
@@ -239,21 +267,37 @@ namespace DeviceDataCollector.Services
 
                         // Option 1: Only update the current status instead of adding to history
                         await UpdateCurrentDeviceStatusAsync(dbContext, status);
-
-                        // Option 2: Save to history selectively or with a different frequency
-                        // You can implement different strategies here, such as:
-                        // 1. Only save a history record if the status changed significantly
-                        // 2. Save a history record every N minutes regardless of changes
-                        // 3. Save a history record based on other business rules
-
-                        // Example of selective history recording (uncomment if needed):
-                        // await MaybeRecordStatusHistoryAsync(dbContext, status);
                     }
                     else if (parsedMessage is DonationsData donationData)
                     {
                         dbContext.DonationsData.Add(donationData);
                         await dbContext.SaveChangesAsync();
                         _logger.LogInformation($"Donation data from {ipAddress}:{port} stored in database");
+                    }
+                    else if (parsedMessage is SerialUpdateResponse updateResponse)
+                    {
+                        _logger.LogInformation($"Serial number update response received: {updateResponse.OldSerialNumber} -> {updateResponse.NewSerialNumber}, Status: {updateResponse.Status}");
+
+                        // If this is a successful update (contains 'OK' status), update the device record
+                        if (updateResponse.Status == "OK")
+                        {
+                            var device = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == updateResponse.OldSerialNumber);
+                            if (device != null)
+                            {
+                                _logger.LogInformation($"Updating device serial number in database from {device.SerialNumber} to {updateResponse.NewSerialNumber}");
+                                device.SerialNumber = updateResponse.NewSerialNumber;
+                                await dbContext.SaveChangesAsync();
+                                _logger.LogInformation($"Database updated successfully with new serial number: {updateResponse.NewSerialNumber}");
+                            }
+                            else
+                            {
+                                _logger.LogWarning($"Device with serial number {updateResponse.OldSerialNumber} not found in database");
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"Serial number update was not successful. Status: {updateResponse.Status}");
+                        }
                     }
                 }
             }
