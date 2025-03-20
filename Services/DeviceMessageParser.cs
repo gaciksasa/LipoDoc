@@ -357,6 +357,7 @@ namespace DeviceDataCollector.Services
                     NewSerialNumber = parts[2],
                     Status = parts[3],
                     CheckSum = parts.Length > 4 ? parts[4].TrimEnd('\u00FD') : null,
+                    RawPayload = message,
                     Timestamp = DateTime.Now
                 };
 
@@ -376,8 +377,7 @@ namespace DeviceDataCollector.Services
             public string NewSerialNumber { get; set; }
             public string Status { get; set; }
             public string CheckSum { get; set; }
-            public string IPAddress { get; set; }
-            public int Port { get; set; }
+            public string RawPayload { get; set; }
             public DateTime Timestamp { get; set; }
         }
     }

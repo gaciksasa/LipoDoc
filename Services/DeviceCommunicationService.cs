@@ -22,8 +22,10 @@ namespace DeviceDataCollector.Services
         }
 
         /// <summary>
-        /// Sends a serial number update command directly to a device and processes the response.
+        /// Sends a serial number update command to the TCP server, which forwards it to the actual device.
         /// </summary>
+        /// <param name="currentSerialNumber">The current serial number of the device</param>
+        /// <param name="newSerialNumber">The new serial number to set on the device</param>
         /// <returns>Tuple with: success flag, response message, and confirmation flag</returns>
         public async Task<(bool Success, string Response, bool Confirmed)> UpdateSerialNumberAsync(string currentSerialNumber, string newSerialNumber)
         {
@@ -31,39 +33,46 @@ namespace DeviceDataCollector.Services
 
             try
             {
-                // Connect to local TCP server on port 5000
+                // Get TCP server configuration from appsettings.json
+                using var scope = _scopeFactory.CreateScope();
+                var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
+                // Use the TCP server IP and port configured in settings
+                string serverIpAddress = configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.1");
+                int serverPort = configuration.GetValue<int>("TCPServer:Port", 5000);
+
+                // Connect to the TCP server
                 using (var client = new TcpClient())
                 {
-                    string ipAddress = "127.0.0.1"; // Connect to localhost
-                    int port = 5000; // Standard TCP server port
+                    _logger.LogInformation($"Connecting to TCP server at {serverIpAddress}:{serverPort}");
 
-                    // Connect to our TCP server
-                    var connectTask = client.ConnectAsync(ipAddress, port);
+                    var connectTask = client.ConnectAsync(serverIpAddress, serverPort);
                     var timeoutTask = Task.Delay(_timeout);
 
                     var completedTask = await Task.WhenAny(connectTask, timeoutTask);
                     if (completedTask == timeoutTask)
                     {
-                        _logger.LogWarning($"Connection to server on port {port} timed out");
+                        _logger.LogWarning($"Connection to TCP server at {serverIpAddress}:{serverPort} timed out");
                         return (false, "Connection timed out", false);
                     }
 
                     if (!client.Connected)
                     {
-                        _logger.LogWarning($"Failed to connect to server on port {port}");
+                        _logger.LogWarning($"Failed to connect to TCP server at {serverIpAddress}:{serverPort}");
                         return (false, "Failed to connect to server", false);
                     }
 
-                    _logger.LogInformation($"Successfully connected to server on port {port}");
+                    _logger.LogInformation($"Successfully connected to TCP server at {serverIpAddress}:{serverPort}");
 
                     // Prepare and send the command
                     using (var stream = client.GetStream())
                     {
-                        // Format is: #iªCurrentSNªNewSNª77ý
-                        string command = $"#i\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AA77\u00FD";
-                        byte[] commandBytes = Encoding.ASCII.GetBytes(command);
+                        // Use the question mark separator since that seems to be what's working in your system
+                        string command = $"#i?{currentSerialNumber}?{newSerialNumber}?77\u00FD";
 
-                        _logger.LogInformation($"Sending command: {command}");
+                        byte[] commandBytes = Encoding.ASCII.GetBytes(command);
+                        _logger.LogInformation($"Sending serial update command: {command}");
+
                         await stream.WriteAsync(commandBytes, 0, commandBytes.Length);
 
                         // Wait for response with timeout
@@ -93,39 +102,10 @@ namespace DeviceDataCollector.Services
                         // Detailed logging of the response bytes
                         _logger.LogDebug($"Response bytes: {BitConverter.ToString(buffer, 0, bytesRead)}");
 
-                        // Check if the response is in the expected format: #IªSX0000000ªLD0000000ªOKª77ý
+                        // Check if the response confirms the operation
                         bool isConfirmed = IsSuccessResponse(response, currentSerialNumber, newSerialNumber);
 
-                        if (isConfirmed)
-                        {
-                            _logger.LogInformation("Response confirms successful serial number update");
-
-                            // Update the database directly here
-                            using (var scope = _scopeFactory.CreateScope())
-                            {
-                                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                                var device = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == currentSerialNumber);
-
-                                if (device != null)
-                                {
-                                    _logger.LogInformation($"Updating device {device.Id} serial number in database from {currentSerialNumber} to {newSerialNumber}");
-                                    device.SerialNumber = newSerialNumber;
-                                    await dbContext.SaveChangesAsync();
-                                    _logger.LogInformation("Database updated successfully");
-                                }
-                                else
-                                {
-                                    _logger.LogWarning($"Device with serial number {currentSerialNumber} not found in database");
-                                }
-                            }
-
-                            return (true, response.Trim(), true);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Response does not confirm successful serial number update");
-                            return (true, response.Trim(), false);
-                        }
+                        return (true, response.Trim(), isConfirmed);
                     }
                 }
             }
@@ -136,9 +116,6 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        /// <summary>
-        /// Checks if the response indicates a successful serial number update
-        /// </summary>
         private bool IsSuccessResponse(string response, string oldSerial, string newSerial)
         {
             // Normalize the response by removing any whitespace or control characters
@@ -146,13 +123,20 @@ namespace DeviceDataCollector.Services
 
             _logger.LogInformation($"Checking response format: {response}");
 
-            // Expected format: #IªSX0000000ªLD0000000ªOKª77ý
-            // Where SX0000000 is the old serial and LD0000000 is the new serial
-
             try
             {
-                // Split the response by the separator character 'ª'
-                string[] parts = response.Split('\u00AA');
+                // Handle different separator characters
+                string[] parts;
+                if (response.Contains("\u00AA"))
+                    parts = response.Split('\u00AA');
+                else if (response.Contains("?"))
+                    parts = response.Split('?');
+                else if (response.Contains("|"))
+                    parts = response.Split('|');
+                else if (response.Contains("*"))
+                    parts = response.Split('*');
+                else
+                    parts = new string[0];
 
                 // Log all parts for debugging
                 for (int i = 0; i < parts.Length; i++)

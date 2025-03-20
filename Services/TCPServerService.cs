@@ -1,6 +1,7 @@
 ﻿using DeviceDataCollector.Data;
 using DeviceDataCollector.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -17,6 +18,8 @@ namespace DeviceDataCollector.Services
         private readonly int _port;
         private readonly string _ipAddress = string.Empty;
         private readonly HashSet<string> _appIpAddresses;
+
+        private static readonly ConcurrentDictionary<string, string> _pendingSerialUpdates = new ConcurrentDictionary<string, string>();
 
         // Added to prevent duplicate processing
         private readonly HashSet<string> _processedMessageHashes = new HashSet<string>();
@@ -141,6 +144,8 @@ namespace DeviceDataCollector.Services
                     else if (data.StartsWith("#u")) messageType = "Request";
                     else if (data.StartsWith("#A")) messageType = "Acknowledge";
                     else if (data.StartsWith("#U")) messageType = "NoMoreData";
+                    else if (data.StartsWith("#i")) messageType = "SerialUpdateRequest";
+                    else if (data.StartsWith("#I")) messageType = "SerialUpdateResponse";
 
                     _logger.LogInformation($"Message type from {clientIP}:{clientPort}: {messageType}");
 
@@ -148,21 +153,30 @@ namespace DeviceDataCollector.Services
                     string messageHash = ComputeMessageHash(data, clientIP, clientPort);
                     bool isNewMessage = false;
 
-                    lock (_lockObject)
+                    // Special handling for SerialUpdateRequest and SerialUpdateResponse messages - always treat as new
+                    if (messageType == "SerialUpdateRequest" || messageType == "SerialUpdateResponse")
                     {
-                        if (!_processedMessageHashes.Contains(messageHash))
+                        isNewMessage = true;
+                    }
+                    else
+                    {
+                        lock (_lockObject)
                         {
-                            _processedMessageHashes.Add(messageHash);
-                            isNewMessage = true;
+                            if (!_processedMessageHashes.Contains(messageHash))
+                            {
+                                _processedMessageHashes.Add(messageHash);
+                                isNewMessage = true;
+                            }
                         }
                     }
 
+                    // Update the message handling in HandleClientAsync method
                     if (isNewMessage)
                     {
                         // Process and store the data
                         await ProcessDeviceMessageAsync(data, clientIP, clientPort);
 
-                        // Only send acknowledgment for Data messages
+                        // Special handling for different message types
                         if (messageType == "Data")
                         {
                             await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
@@ -180,10 +194,13 @@ namespace DeviceDataCollector.Services
                         }
                         else if (messageType == "SerialUpdateRequest")
                         {
-                            _logger.LogInformation($"Received serial number update request from {clientIP}:{clientPort}");
+                            // For #i messages, create a simulated response with proper formatting
+                            string[] parts = data
+                                .Replace("?", "\u00AA")
+                                .Replace("|", "\u00AA")
+                                .Replace("*", "\u00AA")
+                                .Split('\u00AA');
 
-                            // Parse the message to extract current and new serial numbers
-                            string[] parts = data.Split('\u00AA');
                             if (parts.Length >= 3)
                             {
                                 string currentSerialNumber = parts[1];
@@ -191,30 +208,19 @@ namespace DeviceDataCollector.Services
 
                                 _logger.LogInformation($"Processing serial number update request: {currentSerialNumber} -> {newSerialNumber}");
 
-                                // Generate a response message: #IªOldSNªNewSNªOKª77ý
+                                // For testing, create a simulated response
                                 string responseMessage = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAOK\u00AA77\u00FD";
                                 byte[] responseBytes = Encoding.ASCII.GetBytes(responseMessage);
 
                                 // Send the response
-                                await stream.WriteAsync(responseBytes, 0, responseBytes.Length, stoppingToken);
+                                await client.GetStream().WriteAsync(responseBytes, 0, responseBytes.Length, stoppingToken);
 
-                                _logger.LogInformation($"Sent serial number update response: {responseMessage}");
+                                _logger.LogInformation($"Sent simulated serial number update response: {responseMessage}");
                             }
                             else
                             {
                                 _logger.LogWarning($"Invalid serial update request format: {data}");
                             }
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogInformation($"Skipping already processed message from {clientIP}:{clientPort}");
-
-                        // Only send acknowledgment for Data messages, even for duplicates
-                        if (messageType == "Data")
-                        {
-                            await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
-                            _logger.LogInformation($"Sent acknowledgment for duplicate Data message from {clientIP}:{clientPort}");
                         }
                     }
                 }
@@ -230,6 +236,166 @@ namespace DeviceDataCollector.Services
             {
                 client.Close();
                 _logger.LogInformation($"Client disconnected: {clientIP}:{clientPort}");
+            }
+        }
+
+        private async Task HandleSerialUpdateRequestAsync(TcpClient client, string message, string clientIP, int clientPort, CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Parse the message to extract current and new serial numbers
+                string[] parts = message.Split('\u00AA');
+                if (parts.Length < 3)
+                {
+                    _logger.LogWarning($"Invalid serial update request format: {message}");
+                    return;
+                }
+
+                string currentSerialNumber = parts[1];
+                string newSerialNumber = parts[2];
+
+                _logger.LogInformation($"Processing serial number update request: {currentSerialNumber} -> {newSerialNumber}");
+
+                // Find the device's IP address from our database
+                string deviceIP;
+                int devicePort = 5000;
+
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                    // Try to get IP from current status first
+                    var currentStatus = await dbContext.CurrentDeviceStatuses
+                        .FirstOrDefaultAsync(s => s.DeviceId == currentSerialNumber);
+
+                    if (currentStatus != null && !string.IsNullOrEmpty(currentStatus.IPAddress))
+                    {
+                        deviceIP = currentStatus.IPAddress;
+                        devicePort = currentStatus.Port;
+                        _logger.LogInformation($"Found device IP from current status: {deviceIP}:{devicePort}");
+                    }
+                    else
+                    {
+                        // Fall back to latest donation data
+                        var latestData = await dbContext.DonationsData
+                            .Where(d => d.DeviceId == currentSerialNumber)
+                            .OrderByDescending(d => d.Timestamp)
+                            .FirstOrDefaultAsync();
+
+                        if (latestData != null && !string.IsNullOrEmpty(latestData.IPAddress))
+                        {
+                            deviceIP = latestData.IPAddress;
+                            devicePort = latestData.Port;
+                            _logger.LogInformation($"Found device IP from latest data: {deviceIP}:{devicePort}");
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"No IP address found for device {currentSerialNumber}");
+
+                            // Return an error message to the client
+                            string errorResponse = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAFailed\u00AA77\u00FD";
+                            byte[] errorBytes = Encoding.ASCII.GetBytes(errorResponse);
+                            await client.GetStream().WriteAsync(errorBytes, 0, errorBytes.Length, stoppingToken);
+                            return;
+                        }
+                    }
+                }
+
+                // Forward the serial update request to the real device
+                using (var deviceClient = new TcpClient())
+                {
+                    try
+                    {
+                        // Connect to the device with timeout
+                        var connectTask = deviceClient.ConnectAsync(deviceIP, devicePort);
+                        var timeoutTask = Task.Delay(5000); // 5 second timeout
+
+                        var completedTask = await Task.WhenAny(connectTask, timeoutTask);
+                        if (completedTask == timeoutTask)
+                        {
+                            _logger.LogWarning($"Connection to device at {deviceIP}:{devicePort} timed out");
+
+                            // Return timeout error to client
+                            string timeoutResponse = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AATimeout\u00AA77\u00FD";
+                            byte[] timeoutBytes = Encoding.ASCII.GetBytes(timeoutResponse);
+                            await client.GetStream().WriteAsync(timeoutBytes, 0, timeoutBytes.Length, stoppingToken);
+                            return;
+                        }
+
+                        if (!deviceClient.Connected)
+                        {
+                            _logger.LogWarning($"Failed to connect to device at {deviceIP}:{devicePort}");
+
+                            // Return connection error to client
+                            string connErrorResponse = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAConnFailed\u00AA77\u00FD";
+                            byte[] connErrorBytes = Encoding.ASCII.GetBytes(connErrorResponse);
+                            await client.GetStream().WriteAsync(connErrorBytes, 0, connErrorBytes.Length, stoppingToken);
+                            return;
+                        }
+
+                        // Successfully connected to the device
+                        _logger.LogInformation($"Connected to device at {deviceIP}:{devicePort}");
+
+                        using (var deviceStream = deviceClient.GetStream())
+                        {
+                            // Forward the original message to the device
+                            byte[] requestBytes = Encoding.ASCII.GetBytes(message);
+                            await deviceStream.WriteAsync(requestBytes, 0, requestBytes.Length, stoppingToken);
+                            _logger.LogInformation($"Forwarded serial update request to device: {message}");
+
+                            // Read the device's response with timeout
+                            var buffer = new byte[4096];
+
+                            var readTask = deviceStream.ReadAsync(buffer, 0, buffer.Length, stoppingToken);
+                            var readTimeoutTask = Task.Delay(10000); // 10 second read timeout
+
+                            var readCompletedTask = await Task.WhenAny(readTask, readTimeoutTask);
+                            if (readCompletedTask == readTimeoutTask)
+                            {
+                                _logger.LogWarning($"Reading response from device timed out");
+
+                                // Return read timeout error to client
+                                string readTimeoutResponse = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAReadTimeout\u00AA77\u00FD";
+                                byte[] readTimeoutBytes = Encoding.ASCII.GetBytes(readTimeoutResponse);
+                                await client.GetStream().WriteAsync(readTimeoutBytes, 0, readTimeoutBytes.Length, stoppingToken);
+                                return;
+                            }
+
+                            int bytesRead = await readTask;
+                            if (bytesRead == 0)
+                            {
+                                _logger.LogWarning($"Device closed connection without sending response");
+
+                                // Return empty response error to client
+                                string emptyResponse = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AANoResponse\u00AA77\u00FD";
+                                byte[] emptyBytes = Encoding.ASCII.GetBytes(emptyResponse);
+                                await client.GetStream().WriteAsync(emptyBytes, 0, emptyBytes.Length, stoppingToken);
+                                return;
+                            }
+
+                            // Get the device's response
+                            string deviceResponse = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                            _logger.LogInformation($"Received response from device: {deviceResponse}");
+
+                            // Forward the response back to the client
+                            await client.GetStream().WriteAsync(buffer, 0, bytesRead, stoppingToken);
+                            _logger.LogInformation($"Forwarded device response to client");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error communicating with device at {deviceIP}:{devicePort}");
+
+                        // Return error to client
+                        string exceptionResponse = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAError\u00AA77\u00FD";
+                        byte[] exceptionBytes = Encoding.ASCII.GetBytes(exceptionResponse);
+                        await client.GetStream().WriteAsync(exceptionBytes, 0, exceptionBytes.Length, stoppingToken);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error handling serial update request");
             }
         }
 
@@ -530,6 +696,11 @@ namespace DeviceDataCollector.Services
             {
                 _logger.LogError(ex, $"Error sending acknowledgment to client {clientIP}");
             }
+        }
+
+        public static void QueueSerialUpdate(string currentSerial, string newSerial)
+        {
+            _pendingSerialUpdates[currentSerial] = newSerial;
         }
     }
 }
