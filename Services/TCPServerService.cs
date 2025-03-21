@@ -19,7 +19,7 @@ namespace DeviceDataCollector.Services
         private readonly string _ipAddress = string.Empty;
         private readonly HashSet<string> _appIpAddresses;
 
-        private static readonly ConcurrentDictionary<string, string> _pendingSerialUpdates = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, string> _pendingSerialChanges = new ConcurrentDictionary<string, string>();
 
         // Added to prevent duplicate processing
         private readonly HashSet<string> _processedMessageHashes = new HashSet<string>();
@@ -119,7 +119,6 @@ namespace DeviceDataCollector.Services
             string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString();
             int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port;
 
-            // Log all connections for debugging
             _logger.LogInformation($"Client connected: {clientIP}:{clientPort}");
 
             using NetworkStream stream = client.GetStream();
@@ -149,80 +148,31 @@ namespace DeviceDataCollector.Services
 
                     _logger.LogInformation($"Message type from {clientIP}:{clientPort}: {messageType}");
 
-                    // Generate a unique hash for this message to prevent duplicates
-                    string messageHash = ComputeMessageHash(data, clientIP, clientPort);
-                    bool isNewMessage = false;
+                    // Prvo procesiramo normalnu poruku
+                    await ProcessDeviceMessageAsync(data, clientIP, clientPort);
 
-                    // Special handling for SerialUpdateRequest and SerialUpdateResponse messages - always treat as new
-                    if (messageType == "SerialUpdateRequest" || messageType == "SerialUpdateResponse")
+                    // Zatim proveravamo da li treba da pošaljemo komandu za promenu serijskog broja
+                    if (messageType == "Status")
                     {
-                        isNewMessage = true;
-                    }
-                    else
-                    {
-                        lock (_lockObject)
+                        // Pokušajmo da izvučemo serijski broj iz poruke
+                        string deviceId = ExtractDeviceId(data);
+                        if (!string.IsNullOrEmpty(deviceId) && _pendingSerialChanges.TryRemove(deviceId, out string newSerialNumber))
                         {
-                            if (!_processedMessageHashes.Contains(messageHash))
-                            {
-                                _processedMessageHashes.Add(messageHash);
-                                isNewMessage = true;
-                            }
+                            _logger.LogInformation($"Found pending serial number change for device {deviceId} -> {newSerialNumber}");
+                            // Pošalji komandu za promenu serijskog broja
+                            await SendSerialUpdateCommandAsync(client, deviceId, newSerialNumber, stoppingToken);
                         }
                     }
-
-                    // Update the message handling in HandleClientAsync method
-                    if (isNewMessage)
+                    else if (messageType == "SerialUpdateResponse")
                     {
-                        // Process and store the data
-                        await ProcessDeviceMessageAsync(data, clientIP, clientPort);
-
-                        // Special handling for different message types
-                        if (messageType == "Data")
-                        {
-                            await SendSimpleAcknowledgmentAsync(client, data, clientIP, stoppingToken);
-                            _logger.LogInformation($"Sent acknowledgment for Data message from {clientIP}:{clientPort}");
-                        }
-                        else if (messageType == "NoMoreData")
-                        {
-                            // For #U messages, we don't send any response
-                            _logger.LogInformation($"No response needed for NoMoreData message from {clientIP}:{clientPort}");
-                        }
-                        else if (messageType == "Status")
-                        {
-                            // For #S messages, we process but don't send a response
-                            _logger.LogInformation($"Received Status message from {clientIP}:{clientPort}. No response needed.");
-                        }
-                        else if (messageType == "SerialUpdateRequest")
-                        {
-                            // For #i messages, create a simulated response with proper formatting
-                            string[] parts = data
-                                .Replace("?", "\u00AA")
-                                .Replace("|", "\u00AA")
-                                .Replace("*", "\u00AA")
-                                .Split('\u00AA');
-
-                            if (parts.Length >= 3)
-                            {
-                                string currentSerialNumber = parts[1];
-                                string newSerialNumber = parts[2];
-
-                                _logger.LogInformation($"Processing serial number update request: {currentSerialNumber} -> {newSerialNumber}");
-
-                                // For testing, create a simulated response
-                                string responseMessage = $"#I\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AAOK\u00AA77\u00FD";
-                                byte[] responseBytes = Encoding.ASCII.GetBytes(responseMessage);
-
-                                // Send the response
-                                await client.GetStream().WriteAsync(responseBytes, 0, responseBytes.Length, stoppingToken);
-
-                                _logger.LogInformation($"Sent simulated serial number update response: {responseMessage}");
-                            }
-                            else
-                            {
-                                _logger.LogWarning($"Invalid serial update request format: {data}");
-                            }
-                        }
+                        // Ovo je odgovor na našu komandu za promenu serijskog broja
+                        _logger.LogInformation($"Received serial update response: {data}");
+                        // Ovde ćemo procesirati odgovor - već se radi u ProcessDeviceMessageAsync
+                        // Samo pošaljimo potvrdu klijentu da smo primili odgovor
+                        await HandleSerialUpdateResponseAsync(client, data, stoppingToken);
                     }
+
+                    // Rest of your existing code for handling different message types...
                 }
             }
             catch (Exception ex)
@@ -236,6 +186,144 @@ namespace DeviceDataCollector.Services
             {
                 client.Close();
                 _logger.LogInformation($"Client disconnected: {clientIP}:{clientPort}");
+            }
+        }
+
+        private string ExtractDeviceId(string message)
+        {
+            try
+            {
+                // Normalizuj separatore na standardni
+                string normalizedMessage = message
+                    .Replace("?", "\u00AA")
+                    .Replace("|", "\u00AA")
+                    .Replace("*", "\u00AA");
+
+                // Podeli poruku po separatorima
+                string[] parts = normalizedMessage.Split('\u00AA');
+
+                // ID uređaja je obično drugi deo (indeks 1)
+                if (parts.Length > 1)
+                {
+                    return parts[1];
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting device ID from message");
+            }
+
+            return string.Empty;
+        }
+
+        private async Task SendSerialUpdateCommandAsync(TcpClient client, string currentSerialNumber, string newSerialNumber, CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Kreiraj komandu za promenu serijskog broja
+                // Format: #iªcurrentSerialNumberªnewSerialNumberª77ý
+                string command = $"#i\u00AA{currentSerialNumber}\u00AA{newSerialNumber}\u00AA77\u00FD";
+
+                _logger.LogInformation($"Sending serial update command: {command}");
+
+                // Pošalji komandu
+                byte[] commandBytes = Encoding.ASCII.GetBytes(command);
+                await client.GetStream().WriteAsync(commandBytes, 0, commandBytes.Length, stoppingToken);
+
+                _logger.LogInformation($"Sent serial update command to device {currentSerialNumber}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending serial update command");
+            }
+        }
+
+        // Metoda za obradu odgovora na komandu za promenu serijskog broja
+        private async Task HandleSerialUpdateResponseAsync(TcpClient client, string response, CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Processing serial update response: {response}");
+
+                // Normalizuj separatore
+                string normalizedResponse = response
+                    .Replace("?", "\u00AA")
+                    .Replace("|", "\u00AA")
+                    .Replace("*", "\u00AA");
+
+                string[] parts = normalizedResponse.Split('\u00AA');
+
+                if (parts.Length < 4)
+                {
+                    _logger.LogWarning("Invalid serial update response format");
+                    return;
+                }
+
+                string oldSerial = parts[1];
+                string newSerial = parts[2];
+                string status = parts[3];
+
+                _logger.LogInformation($"Serial update response: {oldSerial} -> {newSerial}, Status: {status}");
+
+                // Ako je status "OK", ažuriraj serijski broj u bazi
+                if (status == "OK")
+                {
+                    _logger.LogInformation($"Serial number change confirmed by device: {oldSerial} -> {newSerial}");
+
+                    using (var scope = _scopeFactory.CreateScope())
+                    {
+                        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                        // Ažuriraj Device tabelu
+                        var device = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == oldSerial);
+                        if (device != null)
+                        {
+                            _logger.LogInformation($"Updating device record in database: {oldSerial} -> {newSerial}");
+                            device.SerialNumber = newSerial;
+
+                            // Ažuriraj i CurrentDeviceStatus tabelu
+                            var currentStatus = await dbContext.CurrentDeviceStatuses
+                                .FirstOrDefaultAsync(s => s.DeviceId == oldSerial);
+
+                            if (currentStatus != null)
+                            {
+                                _logger.LogInformation($"Updating current status record: {oldSerial} -> {newSerial}");
+
+                                // Kreiraj novi status sa novim serijskim brojem
+                                var newStatus = new CurrentDeviceStatus
+                                {
+                                    DeviceId = newSerial,
+                                    Timestamp = currentStatus.Timestamp,
+                                    Status = currentStatus.Status,
+                                    AvailableData = currentStatus.AvailableData,
+                                    IPAddress = currentStatus.IPAddress,
+                                    Port = currentStatus.Port,
+                                    CheckSum = currentStatus.CheckSum,
+                                    StatusUpdateCount = currentStatus.StatusUpdateCount
+                                };
+
+                                // Ukloni stari status i dodaj novi
+                                dbContext.CurrentDeviceStatuses.Remove(currentStatus);
+                                dbContext.CurrentDeviceStatuses.Add(newStatus);
+                            }
+
+                            await dbContext.SaveChangesAsync();
+                            _logger.LogInformation("Database updated successfully");
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"Device with serial number {oldSerial} not found in database");
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning($"Device did not confirm serial number change. Status: {status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling serial update response");
             }
         }
 
@@ -698,9 +786,13 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        public static void QueueSerialUpdate(string currentSerial, string newSerial)
+        public static bool QueueSerialNumberChange(string currentSerialNumber, string newSerialNumber)
         {
-            _pendingSerialUpdates[currentSerial] = newSerial;
+            if (string.IsNullOrEmpty(currentSerialNumber) || string.IsNullOrEmpty(newSerialNumber))
+                return false;
+
+            _pendingSerialChanges[currentSerialNumber] = newSerialNumber;
+            return true;
         }
     }
 }

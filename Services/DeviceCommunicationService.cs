@@ -29,89 +29,28 @@ namespace DeviceDataCollector.Services
         /// <returns>Tuple with: success flag, response message, and confirmation flag</returns>
         public async Task<(bool Success, string Response, bool Confirmed)> UpdateSerialNumberAsync(string currentSerialNumber, string newSerialNumber)
         {
-            _logger.LogInformation($"Initiating serial number update. Current: {currentSerialNumber}, New: {newSerialNumber}");
+            _logger.LogInformation($"Queueing serial number update. Current: {currentSerialNumber}, New: {newSerialNumber}");
 
             try
             {
-                // Get TCP server configuration from appsettings.json
-                using var scope = _scopeFactory.CreateScope();
-                var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                // Dodaj serijski broj u red čekanja za promenu
+                bool queued = TCPServerService.QueueSerialNumberChange(currentSerialNumber, newSerialNumber);
 
-                // Use the TCP server IP and port configured in settings
-                string serverIpAddress = configuration.GetValue<string>("TCPServer:IPAddress", "127.0.0.1");
-                int serverPort = configuration.GetValue<int>("TCPServer:Port", 5000);
-
-                // Connect to the TCP server
-                using (var client = new TcpClient())
+                if (!queued)
                 {
-                    _logger.LogInformation($"Connecting to TCP server at {serverIpAddress}:{serverPort}");
-
-                    var connectTask = client.ConnectAsync(serverIpAddress, serverPort);
-                    var timeoutTask = Task.Delay(_timeout);
-
-                    var completedTask = await Task.WhenAny(connectTask, timeoutTask);
-                    if (completedTask == timeoutTask)
-                    {
-                        _logger.LogWarning($"Connection to TCP server at {serverIpAddress}:{serverPort} timed out");
-                        return (false, "Connection timed out", false);
-                    }
-
-                    if (!client.Connected)
-                    {
-                        _logger.LogWarning($"Failed to connect to TCP server at {serverIpAddress}:{serverPort}");
-                        return (false, "Failed to connect to server", false);
-                    }
-
-                    _logger.LogInformation($"Successfully connected to TCP server at {serverIpAddress}:{serverPort}");
-
-                    // Prepare and send the command
-                    using (var stream = client.GetStream())
-                    {
-                        // Use the question mark separator since that seems to be what's working in your system
-                        string command = $"#i?{currentSerialNumber}?{newSerialNumber}?77\u00FD";
-
-                        byte[] commandBytes = Encoding.ASCII.GetBytes(command);
-                        _logger.LogInformation($"Sending serial update command: {command}");
-
-                        await stream.WriteAsync(commandBytes, 0, commandBytes.Length);
-
-                        // Wait for response with timeout
-                        var buffer = new byte[4096];
-
-                        // Set up a task to read from the stream
-                        var readTask = stream.ReadAsync(buffer, 0, buffer.Length);
-                        var readTimeoutTask = Task.Delay(_timeout);
-
-                        var readCompleted = await Task.WhenAny(readTask, readTimeoutTask);
-                        if (readCompleted == readTimeoutTask)
-                        {
-                            _logger.LogWarning("No response received within timeout period");
-                            return (false, "No response received (timeout)", false);
-                        }
-
-                        int bytesRead = await readTask;
-                        if (bytesRead == 0)
-                        {
-                            _logger.LogWarning("Connection closed by server");
-                            return (false, "Connection closed by server", false);
-                        }
-
-                        string response = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                        _logger.LogInformation($"Received response: {response.Trim()}");
-
-                        // Detailed logging of the response bytes
-                        _logger.LogDebug($"Response bytes: {BitConverter.ToString(buffer, 0, bytesRead)}");
-
-                        // Check if the response confirms the operation
-                        bool isConfirmed = IsSuccessResponse(response, currentSerialNumber, newSerialNumber);
-
-                        return (true, response.Trim(), isConfirmed);
-                    }
+                    return (false, "Failed to queue serial number change", false);
                 }
+
+                // Ovde možemo vratiti uspeh za ubacivanje u red čekanja,
+                // ali potvrdu ćemo dobiti tek kada uređaj odgovori na komandu
+                return (true, "Serial number change queued. The change will be applied when the device next communicates with the server.", false);
+
+                // Napomena: Stvarna potvrda promene serijskog broja će biti obrađena u TCPServerService
+                // kada dobijemo odgovor od uređaja. Baza podataka će biti ažurirana tamo.
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error sending serial number update command");
+                _logger.LogError(ex, $"Error queueing serial number update command");
                 return (false, $"Error: {ex.Message}", false);
             }
         }

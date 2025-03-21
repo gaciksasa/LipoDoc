@@ -150,8 +150,8 @@ namespace DeviceDataCollector.Controllers
                         // Get the communication service
                         var commService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
 
-                        // Send the serial number update command
-                        var (success, response, confirmed) = await commService.UpdateSerialNumberAsync(
+                        // Queue the serial number update command
+                        var (success, response, _) = await commService.UpdateSerialNumberAsync(
                             existingDevice.SerialNumber,
                             NewSerialNumber);
 
@@ -160,22 +160,19 @@ namespace DeviceDataCollector.Controllers
 
                         if (!success)
                         {
-                            // Communication error
-                            TempData["ErrorMessage"] = "Failed to communicate with the TCP server. Device not updated.";
+                            // Failed to queue command
+                            TempData["ErrorMessage"] = "Failed to queue serial number change command.";
                             return View(device);
                         }
 
-                        if (!confirmed)
-                        {
-                            // Device did not confirm the change
-                            TempData["ErrorMessage"] = "Device did not confirm the serial number change. Updates not saved.";
-                            return View(device);
-                        }
+                        // Command successfully queued
+                        TempData["SuccessMessage"] = "Serial number change command queued. The change will be applied when the device next communicates with the server.";
 
-                        // Update was confirmed by the device, update the serial number
-                        device.SerialNumber = NewSerialNumber;
-                        _logger.LogInformation($"Device serial number changed from {existingDevice.SerialNumber} to {NewSerialNumber}");
-                        TempData["SuccessMessage"] = "Serial number updated successfully on device and in database.";
+                        // VAŽNO: NE ažuriramo serijski broj u bazi podataka odmah
+                        // To će biti urađeno u TCPServerService kada dobijemo potvrdu od uređaja
+
+                        // UMESTO TOGA, sačuvajmo ostale izmene, ali vratimo originalni serijski broj
+                        device.SerialNumber = existingDevice.SerialNumber;
                     }
 
                     // Update the device in the database
