@@ -20,9 +20,50 @@ namespace DeviceDataCollector.Controllers
             _logger = logger;
         }
 
+        private void AddSerialChangeQueuedNotification(string serialNumber, string newSerialNumber)
+        {
+            TempData["SerialChangeQueued"] = true;
+            TempData["QueuedSerial"] = serialNumber;
+            TempData["QueuedNewSerial"] = newSerialNumber;
+
+            // The timestamp can help identify/differentiate notifications
+            TempData["QueuedTimestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        }
+
         // GET: Devices
         public async Task<IActionResult> Index()
         {
+            try
+            {
+                // Check for serial update notifications
+                var serialUpdateNotifications = await _context.SystemNotifications
+                    .Where(n => n.Type == "SerialNumberUpdate" && !n.Read)
+                    .OrderByDescending(n => n.Timestamp)
+                    .ToListAsync();
+
+                // Mark them as read
+                foreach (var notification in serialUpdateNotifications)
+                {
+                    notification.Read = true;
+                }
+
+                if (serialUpdateNotifications.Any())
+                {
+                    await _context.SaveChangesAsync();
+                }
+
+                // Store as a list in ViewBag, not as IQueryable
+                ViewBag.SerialUpdateNotifications = serialUpdateNotifications;
+                ViewBag.HasSerialUpdateNotifications = serialUpdateNotifications.Any();
+            }
+            catch (Exception ex)
+            {
+                // Log the error but continue
+                _logger.LogError(ex, "Error accessing SystemNotifications");
+                ViewBag.SerialUpdateNotifications = new List<SystemNotification>();
+                ViewBag.HasSerialUpdateNotifications = false;
+            }
+
             var devices = await _context.Devices
                 .OrderByDescending(d => d.LastConnectionTime)
                 .ToListAsync();
@@ -147,31 +188,29 @@ namespace DeviceDataCollector.Controllers
                 {
                     if (serialNumberChangeRequested)
                     {
-                        // Get the communication service
-                        var commService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
+                        // Clear any existing serial change notifications for this device
+                        if (TempData["SerialChangeQueued"] != null && TempData["QueuedSerial"].ToString() == existingDevice.SerialNumber)
+                        {
+                            TempData.Remove("SerialChangeQueued");
+                            TempData.Remove("QueuedSerial");
+                            TempData.Remove("QueuedNewSerial");
+                            TempData.Remove("QueuedTimestamp");
+                        }
 
-                        // Queue the serial number update command
+                        // Queue the new serial number update command
+                        var commService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
                         var (success, response, _) = await commService.UpdateSerialNumberAsync(
                             existingDevice.SerialNumber,
                             NewSerialNumber);
 
-                        // Store the response for display
-                        TempData["CommandResponse"] = response;
-
                         if (!success)
                         {
-                            // Failed to queue command
                             TempData["ErrorMessage"] = "Failed to queue serial number change command.";
                             return View(device);
                         }
 
-                        // Command successfully queued
-                        TempData["SuccessMessage"] = "Serial number change command queued. The change will be applied when the device next communicates with the server.";
-
-                        // VAŽNO: NE ažuriramo serijski broj u bazi podataka odmah
-                        // To će biti urađeno u TCPServerService kada dobijemo potvrdu od uređaja
-
-                        // UMESTO TOGA, sačuvajmo ostale izmene, ali vratimo originalni serijski broj
+                        // Add the notification
+                        AddSerialChangeQueuedNotification(existingDevice.SerialNumber, NewSerialNumber);
                         device.SerialNumber = existingDevice.SerialNumber;
                     }
 

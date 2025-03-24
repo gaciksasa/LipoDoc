@@ -4,6 +4,7 @@ using DeviceDataCollector.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DeviceDataCollector.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250324083708_AddSystemNotificationsTable")]
+    partial class AddSystemNotificationsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -273,20 +276,20 @@ namespace DeviceDataCollector.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2025, 3, 24, 9, 51, 20, 387, DateTimeKind.Local).AddTicks(1694),
+                            CreatedAt = new DateTime(2025, 3, 24, 9, 37, 6, 696, DateTimeKind.Local).AddTicks(9003),
                             Email = "admin@blooddonation.org",
                             FullName = "Administrator",
-                            PasswordHash = "$2a$11$zZDnOvjueZ3zo6UEqnrokutSVnf7drlLc8EZ5fxY.bfRYtbTuRGVm",
+                            PasswordHash = "$2a$11$RBlMUJGM0QkMGQJpfysIzehyU8tsDxxglBwbD5xw.Rt8./ppavxoK",
                             Role = "Admin",
                             Username = "admin"
                         },
                         new
                         {
                             Id = 2,
-                            CreatedAt = new DateTime(2025, 3, 24, 9, 51, 20, 554, DateTimeKind.Local).AddTicks(8617),
+                            CreatedAt = new DateTime(2025, 3, 24, 9, 37, 6, 889, DateTimeKind.Local).AddTicks(2703),
                             Email = "user@blooddonation.org",
                             FullName = "Regular User",
-                            PasswordHash = "$2a$11$pWiwWz3JRorFhXBENv294OUzM6SX4JA1sCvLzBPzzskta43dvg.ly",
+                            PasswordHash = "$2a$11$q6eU4ppbMTvuixAnoGAPRum5Q5clyCcglgaXj33sE6UXOjk3Twbfq",
                             Role = "User",
                             Username = "user"
                         });

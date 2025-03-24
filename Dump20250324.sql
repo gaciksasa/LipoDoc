@@ -1,0 +1,271 @@
+-- MySQL dump 10.13  Distrib 9.2.0, for Win64 (x86_64)
+--
+-- Host: localhost    Database: devicedata
+-- ------------------------------------------------------
+-- Server version	9.2.0
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `__efmigrationshistory`
+--
+
+DROP TABLE IF EXISTS `__efmigrationshistory`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `__efmigrationshistory` (
+  `MigrationId` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `ProductVersion` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  PRIMARY KEY (`MigrationId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `__efmigrationshistory`
+--
+
+LOCK TABLES `__efmigrationshistory` WRITE;
+/*!40000 ALTER TABLE `__efmigrationshistory` DISABLE KEYS */;
+INSERT INTO `__efmigrationshistory` VALUES ('20250225074347_InitialCreate','8.0.13');
+/*!40000 ALTER TABLE `__efmigrationshistory` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `currentdevicestatuses`
+--
+
+DROP TABLE IF EXISTS `currentdevicestatuses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `currentdevicestatuses` (
+  `DeviceId` varchar(255) NOT NULL,
+  `Timestamp` datetime(6) NOT NULL,
+  `Status` int NOT NULL,
+  `AvailableData` int NOT NULL,
+  `IPAddress` longtext,
+  `Port` int NOT NULL,
+  `CheckSum` longtext,
+  `StatusUpdateCount` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`DeviceId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `currentdevicestatuses`
+--
+
+LOCK TABLES `currentdevicestatuses` WRITE;
+/*!40000 ALTER TABLE `currentdevicestatuses` DISABLE KEYS */;
+INSERT INTO `currentdevicestatuses` VALUES ('HERCULES001','2025-02-26 14:19:28.000000',0,1,'192.168.1.130',51511,'D7',5),('LD0000000','2020-01-01 04:07:57.000000',0,0,'192.168.1.101',54182,'C8',7825),('LD0000001','2025-03-14 09:37:16.000000',1,0,'192.168.1.124',54336,'8329',707),('LD0000009','2025-03-06 10:08:37.784588',0,0,'192.168.1.124',58227,'\"4626\"',18),('LD0000010','2025-03-06 10:10:51.000000',0,0,'192.168.1.124',58292,'4749',4),('LD0000011','2025-03-06 10:17:20.000000',1,9,'192.168.1.124',58812,'7228',73),('LD0000063','2025-03-12 07:15:06.000000',0,0,'10.0.6.68',55066,'3365',7),('LD000013','2025-03-14 08:35:12.000000',2,0,'192.168.1.124',52797,'8983',162),('LD0000345','2025-03-06 09:26:02.801469',2,0,'192.168.1.124',55529,'\"2012\"',174),('LD000063','2025-03-12 07:39:42.000000',1,0,'10.0.6.68',61602,'2819',363),('LD000345','2025-03-06 09:00:20.258675',2,0,'192.168.1.124',53707,'\"1794\"',20),('LD0012555','2025-03-06 09:14:26.569921',0,0,'192.168.1.124',54392,'\"1316\"',42),('LD1234567','2025-03-12 07:50:26.000000',1,0,'192.168.1.124',62172,'6532',75),('LD2222222','2020-01-01 04:03:10.000000',0,0,'192.168.1.101',54182,'C7',28),('LD3333333','2020-01-01 02:55:58.000000',0,0,'192.168.1.101',54066,'DF',24),('LD7777777','2020-01-01 02:59:11.000000',0,0,'192.168.1.101',54066,'F4',45),('LD8888888','2025-03-11 15:55:22.000000',0,1,'192.168.1.101',50339,'09',44),('LD9999999','2020-01-01 03:37:19.000000',0,0,'192.168.1.101',54164,'0A',131);
+/*!40000 ALTER TABLE `currentdevicestatuses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `devicedata`
+--
+
+DROP TABLE IF EXISTS `devicedata`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `devicedata` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `DeviceId` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `Timestamp` datetime(6) NOT NULL,
+  `DataPayload` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `IPAddress` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `Port` int NOT NULL,
+  PRIMARY KEY (`Id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `devicedata`
+--
+
+LOCK TABLES `devicedata` WRITE;
+/*!40000 ALTER TABLE `devicedata` DISABLE KEYS */;
+/*!40000 ALTER TABLE `devicedata` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `devices`
+--
+
+DROP TABLE IF EXISTS `devices`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `devices` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `SerialNumber` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `Name` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `Location` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `LastConnectionTime` datetime(6) DEFAULT NULL,
+  `RegisteredDate` datetime(6) NOT NULL,
+  `IsActive` tinyint(1) NOT NULL,
+  `Notes` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  PRIMARY KEY (`Id`)
+) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `devices`
+--
+
+LOCK TABLES `devices` WRITE;
+/*!40000 ALTER TABLE `devices` DISABLE KEYS */;
+INSERT INTO `devices` VALUES (52,'LD1234567','Device LD1234567',NULL,'2025-03-12 07:50:26.995985','2025-03-12 07:45:42.807016',0,'Device auto-registered from status message\nIP: 192.168.1.124\nRegistered: 3/12/2025 7:45:42 AM\nStatus: ACTIVE'),(53,'LD000013','Device LD000013',NULL,'2025-03-14 08:35:12.784494','2025-03-14 08:24:32.623743',0,'Device auto-registered from status message\nIP: 192.168.1.124\nRegistered: 3/14/2025 8:24:32 AM\nStatus: ACTIVE'),(63,'LD0000000','Device LD0000000',NULL,'2025-03-24 10:29:47.365181','2025-03-24 09:14:42.241526',1,'Device auto-registered from status message\r\nIP: 192.168.1.101\r\nRegistered: 3/24/2025 9:14:42 AM\r\nStatus: ACTIVE');
+/*!40000 ALTER TABLE `devices` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `devicestatuses`
+--
+
+DROP TABLE IF EXISTS `devicestatuses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `devicestatuses` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `DeviceId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `Timestamp` datetime(6) NOT NULL,
+  `Status` int NOT NULL,
+  `AvailableData` int NOT NULL,
+  `RawPayload` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `IPAddress` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `Port` int NOT NULL,
+  `CheckSum` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  PRIMARY KEY (`Id`),
+  KEY `IX_DeviceStatuses_DeviceId` (`DeviceId`),
+  KEY `IX_DeviceStatuses_Timestamp` (`Timestamp`)
+) ENGINE=InnoDB AUTO_INCREMENT=9717 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `devicestatuses`
+--
+
+LOCK TABLES `devicestatuses` WRITE;
+/*!40000 ALTER TABLE `devicestatuses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `devicestatuses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `donationsdata`
+--
+
+DROP TABLE IF EXISTS `donationsdata`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `donationsdata` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `DeviceId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `Timestamp` datetime(6) NOT NULL,
+  `MessageType` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `RawPayload` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `IPAddress` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `Port` int NOT NULL,
+  `DeviceStatus` int DEFAULT NULL,
+  `AvailableData` int DEFAULT NULL,
+  `IsBarcodeMode` tinyint(1) NOT NULL,
+  `RefCode` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `DonationIdBarcode` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `OperatorIdBarcode` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `LotNumber` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `LipemicValue` int DEFAULT NULL,
+  `LipemicGroup` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `LipemicStatus` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `CheckSum` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  PRIMARY KEY (`Id`),
+  KEY `IX_DonationsData_DeviceId` (`DeviceId`),
+  KEY `IX_DonationsData_DonationIdBarcode` (`DonationIdBarcode`),
+  KEY `IX_DonationsData_Timestamp` (`Timestamp`)
+) ENGINE=InnoDB AUTO_INCREMENT=125 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `donationsdata`
+--
+
+LOCK TABLES `donationsdata` WRITE;
+/*!40000 ALTER TABLE `donationsdata` DISABLE KEYS */;
+INSERT INTO `donationsdata` VALUES (102,'LD1234567','2025-03-12 07:49:53.000000','#D','#DªLD1234567ª07:49:5312:03:2025ªBª4KA6890795ª04060599804502ª2109ª00410040KAªMª2279ªIIIªLIPEMICªENDEªDEª','192.168.1.124',62099,NULL,NULL,1,'4KA6890795','04060599804502','2109','00410040KA',2279,'III','LIPEMIC',''),(103,'LD1234567','2025-03-12 07:49:53.000000','#D','#DªLD1234567ª07:49:5312:03:2025ªBª4KA4845293ª04060599806887ªªªMª1168ªIIIªLIPEMICªENDEª2Dª','192.168.1.124',62101,NULL,NULL,1,'4KA4845293','04060599806887',NULL,NULL,1168,'III','LIPEMIC',''),(104,'LD1234567','2025-03-12 07:49:53.000000','#D','#DªLD1234567ª07:49:5312:03:2025ªBª4KA5884098ª04060599804476ªª00762471KAªMª3091ªIVªLIPEMICªENDEª1Eª','192.168.1.124',62103,NULL,NULL,1,'4KA5884098','04060599804476',NULL,'00762471KA',3091,'IV','LIPEMIC',''),(105,'LD1234567','2025-03-12 07:49:53.000000','#D','#DªLD1234567ª07:49:5312:03:2025ªBªªMª2523ªIVªLIPEMICªENDEª36ª','192.168.1.124',62107,NULL,NULL,1,NULL,NULL,NULL,NULL,2523,'IV','LIPEMIC',''),(106,'LD1234567','2025-03-12 07:49:54.000000','#D','#DªLD1234567ª07:49:5412:03:2025ªBªªMª2776ªIVªLIPEMICªENDEª28ª','192.168.1.124',62109,NULL,NULL,1,NULL,NULL,NULL,NULL,2776,'IV','LIPEMIC',''),(107,'LD1234567','2025-03-12 07:49:54.000000','#D','#DªLD1234567ª07:49:5412:03:2025ªBª4KA2959470ª04060599801814ª5682ªªMª1619ªIIIªLIPEMICªENDEªFEª','192.168.1.124',62111,NULL,NULL,1,'4KA2959470','04060599801814','5682',NULL,1619,'III','LIPEMIC',''),(108,'LD1234567','2025-03-12 07:49:54.000000','#D','#DªLD1234567ª07:49:5412:03:2025ªBª4KA5258867ª04060599805266ªªªMª791ªIIIªLIPEMICªENDEª5Cª','192.168.1.124',62113,NULL,NULL,1,'4KA5258867','04060599805266',NULL,NULL,791,'III','LIPEMIC',''),(109,'LD1234567','2025-03-12 07:49:55.000000','#D','#DªLD1234567ª07:49:5512:03:2025ªBª4KA3370356ª04060599807547ªª00520974KAªMª1308ªIIIªLIPEMICªENDEª8Fª','192.168.1.124',62117,NULL,NULL,1,'4KA3370356','04060599807547',NULL,'00520974KA',1308,'III','LIPEMIC',''),(110,'LD1234567','2025-03-12 07:49:55.000000','#D','#DªLD1234567ª07:49:5512:03:2025ªBª4KA9325213ª04060599805230ªªªMª2697ªIVªLIPEMICªENDEªA5ª','192.168.1.124',62119,NULL,NULL,1,'4KA9325213','04060599805230',NULL,NULL,2697,'IV','LIPEMIC',''),(111,'LD1234567','2025-03-12 07:49:55.000000','#D','#DªLD1234567ª07:49:5512:03:2025ªBª4KA1631148ª04060599802194ªª00352411KAªMª2286ªIIIªLIPEMICªENDEª26ª','192.168.1.124',62121,NULL,NULL,1,'4KA1631148','04060599802194',NULL,'00352411KA',2286,'III','LIPEMIC',''),(112,'LD1234567','2025-03-12 07:49:55.000000','#D','#DªLD1234567ª07:49:5512:03:2025ªBª4KA1049155ª04060599803720ª9833ªªMª3234ªIVªLIPEMICªENDEªDEª','192.168.1.124',62123,NULL,NULL,1,'4KA1049155','04060599803720','9833',NULL,3234,'IV','LIPEMIC',''),(113,'LD1234567','2025-03-12 07:49:56.000000','#D','#DªLD1234567ª07:49:5612:03:2025ªBªªMª1370ªIIIªLIPEMICªENDEª18ª','192.168.1.124',62125,NULL,NULL,1,NULL,NULL,NULL,NULL,1370,'III','LIPEMIC',''),(114,'LD1234567','2025-03-12 07:49:56.000000','#D','#DªLD1234567ª07:49:5612:03:2025ªBª4KA1550011ª04060599807262ªªªMª1210ªIIIªLIPEMICªENDEªEAª','192.168.1.124',62128,NULL,NULL,1,'4KA1550011','04060599807262',NULL,NULL,1210,'III','LIPEMIC',''),(115,'LD1234567','2025-03-12 07:49:56.000000','#D','#DªLD1234567ª07:49:5612:03:2025ªBªªMª1162ªIIIªLIPEMICªENDEªACª','192.168.1.124',62130,NULL,NULL,1,NULL,NULL,NULL,NULL,1162,'III','LIPEMIC',''),(116,'LD1234567','2025-03-12 07:49:57.000000','#D','#DªLD1234567ª07:49:5712:03:2025ªBª4KA7266812ª04060599805328ª1365ªªMª3175ªIVªLIPEMICªENDEª0Eª','192.168.1.124',62132,NULL,NULL,1,'4KA7266812','04060599805328','1365',NULL,3175,'IV','LIPEMIC',''),(117,'LD1234567','2025-03-12 07:49:57.000000','#D','#DªLD1234567ª07:49:5712:03:2025ªBªªMª990ªIIIªLIPEMICªENDEª56ª','192.168.1.124',62134,NULL,NULL,1,NULL,NULL,NULL,NULL,990,'III','LIPEMIC',''),(118,'LD1234567','2025-03-12 07:49:57.000000','#D','#DªLD1234567ª07:49:5712:03:2025ªBª4KA4541420ª04060599801471ª8764ª00867647KAªMª740ªIIIªLIPEMICªENDEª76ª','192.168.1.124',62138,NULL,NULL,1,'4KA4541420','04060599801471','8764','00867647KA',740,'III','LIPEMIC',''),(119,'LD1234567','2025-03-12 07:49:57.000000','#D','#DªLD1234567ª07:49:5712:03:2025ªBª4KA8229204ª04060599801256ª8212ª00820505KAªMª300ªIIªPASSEDªENDEª17ª','192.168.1.124',62140,NULL,NULL,1,'4KA8229204','04060599801256','8212','00820505KA',300,'II','PASSED',''),(120,'LD1234567','2025-03-12 07:49:58.000000','#D','#DªLD1234567ª07:49:5812:03:2025ªBª4KA7796427ª04060599805188ª9840ª00632513KAªMª1578ªIIIªLIPEMICªENDEªB7ª','192.168.1.124',62142,NULL,NULL,1,'4KA7796427','04060599805188','9840','00632513KA',1578,'III','LIPEMIC',''),(121,'LD1234567','2025-03-12 07:49:58.000000','#D','#DªLD1234567ª07:49:5812:03:2025ªBª4KA6618752ª04060599805613ª7959ª00408904KAªMª1496ªIIIªLIPEMICªENDEª2Eª','192.168.1.124',62144,NULL,NULL,1,'4KA6618752','04060599805613','7959','00408904KA',1496,'III','LIPEMIC',''),(122,'LD000013','2025-03-14 08:25:53.000000','#D','#DªLD000013ª08:25:5314:03:2025ªBª4KA7648458ª04060599804505ª9540ª00150353KAªMª3466ªIVªLIPEMICªENDEªB7ª','192.168.1.124',52218,NULL,NULL,1,'4KA7648458','04060599804505','9540','00150353KA',3466,'IV','LIPEMIC',''),(123,'LD000013','2025-03-14 08:25:53.000000','#D','#DªLD000013ª08:25:5314:03:2025ªBª4KA6626000ª04060599807990ª1108ª00941474KAªMª1538ªIIIªLIPEMICªENDEª6Fª','192.168.1.124',52223,NULL,NULL,1,'4KA6626000','04060599807990','1108','00941474KA',1538,'III','LIPEMIC',''),(124,'LD000013','2025-03-14 08:25:54.000000','#D','#DªLD000013ª08:25:5414:03:2025ªBª4KA7163334ª04060599803433ª2979ª00599063KAªMª2455ªIIIªLIPEMICªENDEª6Fª','192.168.1.124',52235,NULL,NULL,1,'4KA7163334','04060599803433','2979','00599063KA',2455,'III','LIPEMIC','');
+/*!40000 ALTER TABLE `donationsdata` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `systemnotifications`
+--
+
+DROP TABLE IF EXISTS `systemnotifications`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `systemnotifications` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `Type` varchar(255) NOT NULL,
+  `Message` longtext NOT NULL,
+  `Timestamp` datetime(6) NOT NULL,
+  `Read` tinyint(1) NOT NULL,
+  `RelatedEntityId` longtext,
+  PRIMARY KEY (`Id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `systemnotifications`
+--
+
+LOCK TABLES `systemnotifications` WRITE;
+/*!40000 ALTER TABLE `systemnotifications` DISABLE KEYS */;
+INSERT INTO `systemnotifications` VALUES (1,'SerialNumberUpdate','Serial number successfully updated from LD9999999 to LD0000000','2025-03-24 10:16:55.625100',1,'63'),(2,'SerialNumberUpdate','Serial number successfully updated from LD0000000 to LD2222222','2025-03-24 10:17:42.597212',1,'63'),(3,'SerialNumberUpdate','Serial number successfully updated from LD2222222 to LD0000000','2025-03-24 10:25:02.401865',1,'63');
+/*!40000 ALTER TABLE `systemnotifications` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `users`
+--
+
+DROP TABLE IF EXISTS `users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `users` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `Username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `PasswordHash` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `Role` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `FullName` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `Email` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci,
+  `CreatedAt` datetime(6) NOT NULL,
+  `LastLogin` datetime(6) DEFAULT NULL,
+  PRIMARY KEY (`Id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `users`
+--
+
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` VALUES (1,'admin','$2a$11$IHQ.gARYa/pPBV/u5MYnAenuKmUVi3dmQg4jXDgquOcd/EXhYeeGW','Admin','Administrator','admin@blooddonation.org','2025-02-27 12:24:20.361087','2025-03-24 07:25:40.973660'),(2,'user','$2a$11$Eq2gpdJF3Ay4SKeHGrfRbOvNf87zCNHfEtSab/VxgaDLFZQEPjGgK','User','Regular User','user@blooddonation.org','2025-02-27 12:24:20.592338','2025-03-10 13:42:08.062816');
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-03-24 10:40:02

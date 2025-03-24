@@ -32,6 +32,23 @@
         </div>
     }
 
+    @if (ViewBag.HasSerialUpdateNotifications)
+    {
+        foreach (var notification in ViewBag.SerialUpdateNotifications)
+        {
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> @notification.Message
+            </div>
+        }
+    }
+    else if (TempData["SerialChangeQueued"] != null)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-clock"></i> Serial number change command queued for @TempData["QueuedSerial"].
+            The change will be applied when the device next communicates with the server.
+        </div>
+    }
+
     <div id="deviceListContainer">
         @await Html.PartialAsync("_DeviceList", Model)
     </div>
