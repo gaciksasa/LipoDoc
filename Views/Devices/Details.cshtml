@@ -108,14 +108,11 @@
                 </div>
                 <div class="card-footer">
                     <div class="d-flex justify-content-between">
-                        <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+                        <a asp-action="Index" class="btn btn-info">Back to List</a>
                         <div>
-                            <a asp-action="Donations" asp-route-id="@Model.Id" class="btn btn-primary">
-                                <i class="bi bi-droplet"></i> View Donations
-                            </a>
                             @if (User.IsInRole("Admin"))
                             {
-                                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">
+                                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-info">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>
                                 <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-danger">
@@ -210,8 +207,8 @@
                     </div>
 
                     <div class="d-grid gap-2">
-                        <a asp-action="Donations" asp-route-id="@Model.Id" class="btn btn-primary">
-                            <i class="bi bi-droplet"></i> View All Donations
+                        <a asp-action="Donations" asp-route-id="@Model.Id" class="btn btn-info">
+                            <i class="bi bi-droplet"></i> View Donations
                         </a>
                     </div>
                 </div>

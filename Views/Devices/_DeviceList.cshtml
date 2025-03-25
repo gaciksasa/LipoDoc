@@ -59,9 +59,6 @@
                                     <a asp-action="Details" asp-route-id="@device.Id" class="btn btn-sm btn-info">
                                         <i class="bi bi-info-circle"></i> Details
                                     </a>
-                                    <a asp-action="Donations" asp-route-id="@device.Id" class="btn btn-sm btn-primary">
-                                        <i class="bi bi-droplet"></i> Donations
-                                    </a>
                                     @if (User.IsInRole("Admin"))
                                     {
                                         <a asp-action="Edit" asp-route-id="@device.Id" class="btn btn-sm btn-warning">

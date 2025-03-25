@@ -233,8 +233,6 @@ namespace DeviceDataCollector.Services
         {
             try
             {
-                // Delay for 1 second before sending the command
-                await Task.Delay(1000, stoppingToken);
 
                 // Build the command byte-by-byte to ensure correct encoding
                 using (var ms = new MemoryStream())
@@ -242,30 +240,40 @@ namespace DeviceDataCollector.Services
                     // "#i" prefix
                     ms.WriteByte(0x23); // #
                     ms.WriteByte(0x69); // i
-                                        // Separator (0xAA)
+                    
+                    // Separator (0xAA)
                     ms.WriteByte(0xAA);
+                    
                     // Current serial number bytes
                     byte[] currentSerialBytes = Encoding.ASCII.GetBytes(currentSerialNumber);
                     ms.Write(currentSerialBytes, 0, currentSerialBytes.Length);
+                    
                     // Second separator (0xAA)
                     ms.WriteByte(0xAA);
+                    
                     // New serial number bytes
                     byte[] newSerialBytes = Encoding.ASCII.GetBytes(newSerialNumber);
                     ms.Write(newSerialBytes, 0, newSerialBytes.Length);
+                    
                     // Third separator (0xAA)
                     ms.WriteByte(0xAA);
+                    
                     // Calculate the checksum
                     byte[] commandBytesSoFar = ms.ToArray();
                     byte checksum = CalculateChecksum(commandBytesSoFar);
                     byte[] checksumBytes = new byte[] { checksum };
                     ms.Write(checksumBytes, 0, checksumBytes.Length);
+                    
                     // String end (0xFD)
                     ms.WriteByte(0xFD);
+                    
                     // Line feed (0x0A)
                     ms.WriteByte(0x0A);
                     byte[] commandBytes = ms.ToArray();
+                    
                     // Log the bytes in hex format for debugging
                     _logger.LogInformation($"Sending serial update command bytes: {BitConverter.ToString(commandBytes)}");
+                    
                     // Send the command
                     await client.GetStream().WriteAsync(commandBytes, 0, commandBytes.Length, stoppingToken);
                     _logger.LogInformation($"Sent serial update command to device {currentSerialNumber}");
