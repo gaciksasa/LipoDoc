@@ -1,12 +1,13 @@
-# Blood Donation Data Collector
+# LipoDoc Data Collector
 
-A .NET 8 web application designed to collect, store, and manage data from blood donation devices over TCP/IP.
+A robust .NET 8 web application designed to collect, store, and manage data from blood lipemic testing devices over TCP/IP.
 
 ## Overview
 
-The Blood Donation Data Collector is a centralized system that provides:
+LipoDoc Data Collector is a centralized system that provides:
 
 - Real-time data collection from blood lipemic testing devices
+- TCP/IP server for direct device communication
 - Secure data storage in a MySQL database
 - User-friendly web interface for monitoring and managing devices
 - Role-based access control for system security
@@ -14,25 +15,29 @@ The Blood Donation Data Collector is a centralized system that provides:
 
 This application serves as a hub for blood donation centers to monitor their testing devices, collect lipemic test results, and ensure data integrity across multiple locations.
 
-## System Features
+## Features
 
 ### Device Communication
-- TCP/IP server that listens for incoming connections from testing devices
+- TCP/IP server that listens for incoming connections from testing devices on port 5000
+- Support for proprietary LipoDoc device protocol
 - Automatic device registration and status tracking
-- Support for various message formats using standardized protocols
 - Buffered data retrieval for devices with intermittent connectivity
+- Remote device configuration and serial number management
+- Time synchronization between server and devices
 
 ### Data Management
-- Automatic parsing and storage of device messages
-- Comprehensive blood donation test data storage
-- Device status monitoring and tracking
-- Historical data retention and cleanup
+- Comprehensive blood donation lipemic test result storage
+- Real-time device status monitoring and tracking
+- Donation data filtering, sorting, and reporting
+- Database backup and restore capabilities
+- Historical data retention and automated cleanup
 
 ### Web Interface
-- Real-time device monitoring dashboard
-- Detailed donation data visualization
+- Real-time device monitoring dashboard with auto-refresh
+- Detailed donation data visualization with filtering and sorting
 - Device management and configuration
-- User-friendly navigation and responsive design
+- User-friendly responsive design using Bootstrap 5
+- Administrative tools for system maintenance
 
 ### Security
 - Role-based authentication system (Admin/User roles)
@@ -44,14 +49,12 @@ This application serves as a hub for blood donation centers to monitor their tes
 
 The application consists of:
 
-1. **Web Interface** - Built with ASP.NET MVC
+1. **Web Interface** - ASP.NET MVC with Bootstrap 5
 2. **TCP Server** - Background service for device communication
 3. **Database** - MySQL with Entity Framework Core
 4. **Background Services** - For monitoring, cleanup, and maintenance tasks
 
 ## Database Schema
-
-The application uses the following key tables:
 
 ### DonationsData
 Stores the lipemic test results from blood donation devices:
@@ -61,7 +64,6 @@ Stores the lipemic test results from blood donation devices:
 - MessageType (the type of message: "#S", "#D", etc.)
 - RawPayload (the raw message content)
 - IP/Port information
-- Device status information
 - Barcode data (donation ID, operator ID, ref code, lot number)
 - Lipemic test results (value, group, status)
 
@@ -92,49 +94,54 @@ Stores user authentication information:
 - Role (Admin or User)
 - FullName, Email, CreatedAt, LastLogin
 
-## Setting Up the Application
+### SystemNotifications
+Stores system notifications for important events:
+- ID (auto-generated primary key)
+- Type (type of notification)
+- Message (notification content)
+- Timestamp (when the notification was created)
+- Read (whether the notification has been read)
+- RelatedEntityId (optional reference to related entity)
+
+## Device Communication Protocol
+
+The LipoDoc Data Collector communicates with devices using a proprietary protocol. Key message types include:
+
+### Status Messages (`#S`)
+```
+#SªSNªStatusª"timestamp"ª"AvailableData"ª"CS"ý
+```
+
+### Data Messages (`#D`)
+```
+#DªSNªtimestampªBªRefCodeªDonationIdªOperatorIdªLotNumberªMªLipemicValueªLipemicGroupªLipemicStatusªENDEªCSý
+```
+
+### Serial Number Update Messages (`#i`)
+```
+#iªoldSNªnewSNª"CS"ýLF
+```
+
+### Request Buffered Data Messages (`#u`)
+```
+#uªSNªLF
+```
+
+The application handles these messages and more, providing a robust communication layer between devices and the server.
+
+## Getting Started
 
 ### Prerequisites
 
 - .NET 8.0 SDK
 - MySQL Server 8.0 or higher
-- An IDE like Visual Studio 2022 or VS Code
+- Modern web browser
+- Network access to connect with devices
 
-### Configuration
-
-The main configuration is in `appsettings.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "server=localhost;port=3306;database=devicedata;user=root;password=root"
-  },
-  "TCPServer": {
-    "IPAddress": "192.168.1.124",
-    "Port": 5000
-  },
-  "DeviceStatusMonitor": {
-    "CheckIntervalSeconds": 5,
-    "InactiveThresholdSeconds": 10
-  },
-  "DeviceStatusCleanup": {
-    "IntervalHours": 24,
-    "RetentionDays": 30
-  }
-}
-```
-
-Key settings:
-- **DefaultConnection**: Your MySQL connection string
-- **TCPServer:IPAddress**: The IP address to listen on for device connections
-- **TCPServer:Port**: The port to listen on for device connections
-- **DeviceStatusMonitor**: Configuration for device status checking
-- **DeviceStatusCleanup**: Configuration for automatic data cleanup
-
-### Running the Application
+### Installation
 
 1. Clone the repository
-2. Update the MySQL connection string in `appsettings.json`
+2. Update the database connection string in `appsettings.json`
 3. Run the database migrations:
    ```
    dotnet ef database update
@@ -150,7 +157,7 @@ The application will:
 - Start the TCP server for device communication
 - Launch the web interface
 
-## Authentication
+### Default Credentials
 
 The system includes two predefined user accounts:
 
@@ -162,57 +169,77 @@ The system includes two predefined user accounts:
 2. **Regular User**
    - Username: `user`
    - Password: `user123`
-   - Limited access (can view but not modify data)
+   - Limited access (can view data but cannot modify system settings)
 
-## Device Communication Protocol
+## Configuration
 
-Devices communicate with the server using a text-based protocol with the following format:
+The main configuration is in `appsettings.json`:
 
-### Status Messages
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "server=localhost;port=3306;database=devicedata;user=root;password=root"
+  },
+  "TCPServer": {
+    "IPAddress": "192.168.1.130",
+    "Port": 5000
+  },
+  "DeviceStatusMonitor": {
+    "CheckIntervalSeconds": 5,
+    "InactiveThresholdSeconds": 10
+  },
+  "DeviceStatusCleanup": {
+    "IntervalHours": 24,
+    "RetentionDays": 30
+  },
+  "DatabaseBackup": {
+    "Scheduled": {
+      "Enabled": false,
+      "Time": "08:00",
+      "RetentionCount": 7,
+      "IntervalHours": 24
+    }
+  }
+}
 ```
-#SªSNªStatusª"timestamp"ª"AvailableData"ª"CS"ý
-```
 
-### Data Messages
-```
-#DªSNªtimestampªBªRefCodeªDonationIdªOperatorIdªLotNumberªMªLipemicValueªLipemicGroupªLipemicStatusªCSý
-```
+Key settings:
+- **DefaultConnection**: Your MySQL connection string
+- **TCPServer:IPAddress**: The IP address to listen on for device connections
+- **TCPServer:Port**: The port to listen on for device connections (default: 5000)
+- **DeviceStatusMonitor**: Configuration for device status checking frequency
+- **DeviceStatusCleanup**: Configuration for automatic data cleanup
+- **DatabaseBackup**: Configuration for automated database backups
 
-Where:
-- `#S` or `#D` indicates message type (Status or Data)
-- `ª` is the field separator (Unicode 170)
-- `SN` is the device serial number
-- `B` indicates barcode mode (followed by barcode data)
-- `M` indicates measurement data (followed by lipemic test results)
-- `ý` marks the end of the message
+## Key Features In Detail
 
-The application also supports requesting buffered data from devices using:
-```
-#uªSNª\n
-```
+### Device Management
 
-And acknowledges received data with:
-```
-#AªSNª\n
-```
+- Automatic device registration from incoming connections
+- Real-time device status monitoring
+- Remote serial number updates
+- Device activity tracking and alerts
 
-## Background Services
+### Donation Data Collection
 
-The application includes several background services:
+- Automatic parsing of device messages into structured data
+- Support for multiple message formats
+- Barcode scanning integration
+- Lipemic value tracking and classification
 
-1. **TCPServerService** - Listens for incoming connections from devices
-2. **DeviceStatusMonitorService** - Monitors device status and marks devices as inactive when appropriate
-3. **DeviceStatusCleanupService** - Performs periodic cleanup of historical status data
-4. **BufferDataRetrievalService** - Retrieves buffered data from devices on demand
+### Backup and Recovery
 
-## User Interface
+- Manual and scheduled database backups
+- Backup compression and management
+- Database restoration capabilities
+- Configurable retention policies
 
-The web interface is organized into several main sections:
+### Administrative Tools
 
-1. **Home** - Overview and system status
-2. **Donations** - View and manage donation records
-3. **Devices** - Monitor and manage connected devices
-4. **User Management** (Admin only) - Add, edit, and delete user accounts
+- User management
+- Network configuration
+- Database management
+- System monitoring
 
 ## Extending the Application
 
@@ -221,17 +248,8 @@ The web interface is organized into several main sections:
 To add support for new device types:
 
 1. Update the `DeviceMessageParser` class to handle new message formats
-2. Add any new fields to the `DonationsData` model if needed
+2. Add any new fields to the data models if needed
 3. Create migrations to update the database schema
-
-### Adding New Features
-
-The modular design makes it easy to add new features:
-
-1. Create new controller(s) for the feature
-2. Add corresponding model(s) and views
-3. Update the navigation in `_Layout.cshtml`
-4. Add any necessary background services
 
 ## Troubleshooting
 
@@ -251,19 +269,3 @@ The modular design makes it easy to add new features:
    - Verify device is configured with correct server IP and port
    - Check network connectivity between device and server
    - Review server logs for connection attempts
-
-### Logging
-
-The application uses structured logging to help diagnose issues:
-
-- Logs are written to the console by default
-- Adjust log levels in `appsettings.json` to increase or decrease verbosity
-- For production, consider configuring a more robust logging provider
-
-## License
-
-[Your License Information]
-
-## Support
-
-For questions or support, please contact [Your Contact Information]

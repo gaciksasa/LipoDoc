@@ -24,6 +24,16 @@ namespace DeviceDataCollector.Services
             Unknown
         }
 
+        public class SerialUpdateResponse
+        {
+            public string OldSerialNumber { get; set; }
+            public string NewSerialNumber { get; set; }
+            public string Status { get; set; }
+            public string CheckSum { get; set; }
+            public string RawPayload { get; set; }
+            public DateTime Timestamp { get; set; }
+        }
+
         /// <summary>
         /// Parses a raw message from the device and returns the appropriate data model
         /// </summary>
@@ -150,7 +160,8 @@ namespace DeviceDataCollector.Services
                 {
                     DeviceId = parts[1],
                     Status = int.TryParse(parts[2], out int status) ? status : 0,
-                    Timestamp = ParseTimestamp(parts[3]),
+                    Timestamp = ParseTimestamp(parts[3]), // device's timestamp
+                    DeviceTimestamp = ParseTimestamp(parts[3]), // device's original timestamp
                     AvailableData = int.TryParse(parts[4], out int availableData) ? availableData : 0,
                     CheckSum = parts.Length > 5 ? parts[5].TrimEnd('ý') : null,
                     RawPayload = message,
@@ -166,8 +177,6 @@ namespace DeviceDataCollector.Services
                 return null;
             }
         }
-
-        // Services/DeviceMessageParser.cs - completely rewrite the ParseDataMessage method
 
         private DonationsData ParseDataMessage(string message, string ipAddress, int port)
         {
@@ -369,16 +378,6 @@ namespace DeviceDataCollector.Services
                 _logger.LogError(ex, $"Error parsing serial update response: {message}");
                 return null;
             }
-        }
-
-        public class SerialUpdateResponse
-        {
-            public string OldSerialNumber { get; set; }
-            public string NewSerialNumber { get; set; }
-            public string Status { get; set; }
-            public string CheckSum { get; set; }
-            public string RawPayload { get; set; }
-            public DateTime Timestamp { get; set; }
         }
     }
 }

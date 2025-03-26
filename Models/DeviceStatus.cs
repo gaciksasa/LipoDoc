@@ -12,6 +12,8 @@ namespace DeviceDataCollector.Models
 
         public DateTime Timestamp { get; set; } // Time of the status update
 
+        public DateTime DeviceTimestamp { get; set; } // Time reported by the device
+
         public int Status { get; set; } // 0=IDLE, 1=Process in progress, 2=Process completed
 
         public int AvailableData { get; set; } // Number of readings buffered in the device
