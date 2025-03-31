@@ -314,15 +314,28 @@ namespace DeviceDataCollector.Controllers
                         _logger.LogInformation($"Deleted {donationData.Count} donation records for device {serialNumber}");
                     }
 
-                    // Delete related status data
-                    var statusData = await _context.DeviceStatuses
+                    // Delete related status data - MODIFIED: Use ExecuteDelete instead of loading entities
+                    int deletedStatuses = await _context.DeviceStatuses
                         .Where(s => s.DeviceId == device.SerialNumber)
-                        .ToListAsync();
+                        .ExecuteDeleteAsync();
 
-                    if (statusData.Any())
+                    _logger.LogInformation($"Deleted {deletedStatuses} status records for device {serialNumber}");
+
+                    // Also delete from CurrentDeviceStatuses table
+                    try
                     {
-                        _context.DeviceStatuses.RemoveRange(statusData);
-                        _logger.LogInformation($"Deleted {statusData.Count} status records for device {serialNumber}");
+                        var currentStatus = await _context.CurrentDeviceStatuses
+                            .FirstOrDefaultAsync(s => s.DeviceId == device.SerialNumber);
+
+                        if (currentStatus != null)
+                        {
+                            _context.CurrentDeviceStatuses.Remove(currentStatus);
+                            _logger.LogInformation($"Deleted current status record for device {serialNumber}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, $"Could not delete current status for device {serialNumber}, continuing with device deletion");
                     }
                 }
 

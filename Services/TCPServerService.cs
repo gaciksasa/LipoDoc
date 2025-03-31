@@ -120,7 +120,7 @@ namespace DeviceDataCollector.Services
         {
             string clientIP = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Address.ToString();
             int clientPort = ((IPEndPoint)(client.Client.RemoteEndPoint ?? new IPEndPoint(IPAddress.None, 0))).Port;
-            string connectedDeviceId = null; // Changed variable name from deviceId to connectedDeviceId
+            string connectedDeviceId = null;
 
             _logger.LogInformation($"Client connected: {clientIP}:{clientPort}");
 
@@ -131,7 +131,16 @@ namespace DeviceDataCollector.Services
             {
                 while (!stoppingToken.IsCancellationRequested && client.Connected)
                 {
-                    int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, stoppingToken);
+                    int bytesRead;
+                    try
+                    {
+                        bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, stoppingToken);
+                    }
+                    catch (IOException)
+                    {
+                        // Client disconnected
+                        break;
+                    }
 
                     if (bytesRead == 0)
                         break;
@@ -144,9 +153,10 @@ namespace DeviceDataCollector.Services
 
                     if (!string.IsNullOrEmpty(extractedDeviceId))
                     {
-                        connectedDeviceId = extractedDeviceId; // Use the renamed variable
-                                                               // Track this client
-                        AddActiveClient(connectedDeviceId, client);
+                        connectedDeviceId = extractedDeviceId;
+
+                        // Track this client
+                        _activeClients[connectedDeviceId] = client;
                     }
 
                     // Detect message type
@@ -164,39 +174,67 @@ namespace DeviceDataCollector.Services
                     // First process normal message
                     await ProcessDeviceMessageAsync(data, clientIP, clientPort);
 
-                    // Then check if we need to send a serial number change command
-                    if (messageType == "Status")
+                    // Then send acknowledgment immediately within the same method
+                    if (messageType == "Status" && !string.IsNullOrEmpty(connectedDeviceId))
                     {
-                        // Get the device ID from the message
-                        string deviceId = ExtractDeviceId(data);
-
-                        await SendStatusAcknowledgmentAsync(client, deviceId, stoppingToken);
-
-                        if (!string.IsNullOrEmpty(deviceId) && _pendingSerialChanges.TryRemove(deviceId, out string newSerialNumber))
+                        try
                         {
-                            _logger.LogInformation($"Found pending serial number change for device {deviceId} -> {newSerialNumber}");
-                            // Send serial number change command
-                            await SendSerialUpdateCommandAsync(client, deviceId, newSerialNumber, stoppingToken);
+                            // Send acknowledgment directly using the current stream
+                            await SendStatusAcknowledgmentDirect(stream, connectedDeviceId, stoppingToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Error sending status acknowledgment to {connectedDeviceId}");
                         }
 
-                        // Check for pending time sync (using the existing pendingTimeSync dictionary if you have one)
-                        if (!string.IsNullOrEmpty(deviceId) && _pendingTimeSync.TryRemove(deviceId, out string dateTimeFormat))
+                        // Handle pending serial changes and time syncing here
+                        if (_pendingSerialChanges.TryRemove(connectedDeviceId, out string newSerialNumber))
                         {
-                            _logger.LogInformation($"Found pending time sync for device {deviceId} -> {dateTimeFormat}");
-                            // Send time sync command
-                            await SendTimeSyncCommandAsync(client, deviceId, dateTimeFormat, stoppingToken);
+                            _logger.LogInformation($"Found pending serial number change for device {connectedDeviceId} -> {newSerialNumber}");
+                            try
+                            {
+                                // Send serial number change command using the current stream
+                                await SendSerialUpdateCommandDirect(stream, connectedDeviceId, newSerialNumber, stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error sending serial update command to {connectedDeviceId}: {ex.Message}");
+                            }
+                        }
+
+                        if (_pendingTimeSync.TryRemove(connectedDeviceId, out string dateTimeFormat))
+                        {
+                            _logger.LogInformation($"Found pending time sync for device {connectedDeviceId} -> {dateTimeFormat}");
+                            try
+                            {
+                                // Send time sync command using the current stream
+                                await SendTimeSyncCommandDirect(stream, connectedDeviceId, dateTimeFormat, stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error sending time sync command to {connectedDeviceId}: {ex.Message}");
+                            }
                         }
                     }
                     else if (messageType == "SerialUpdateResponse")
                     {
                         // This is the response to our serial number change command
                         _logger.LogInformation($"Received serial update response: {data}");
-                        // Process the response - already done in ProcessDeviceMessageAsync
-                        // Just send an acknowledgment to the client
+                        // Process the response
                         await HandleSerialUpdateResponseAsync(client, data, stoppingToken);
                     }
-
-                    // Rest of your existing code for handling different message types...
+                    else if (messageType == "Data")
+                    {
+                        // For data messages, send a data acknowledgment
+                        try
+                        {
+                            await SendDataAcknowledgmentDirect(stream, connectedDeviceId, stoppingToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Error sending data acknowledgment to {connectedDeviceId}");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -209,13 +247,70 @@ namespace DeviceDataCollector.Services
             finally
             {
                 // Remove the client from tracking
-                if (!string.IsNullOrEmpty(connectedDeviceId)) // Use the renamed variable
+                if (!string.IsNullOrEmpty(connectedDeviceId))
                 {
                     RemoveActiveClient(connectedDeviceId);
                 }
 
-                client.Close();
+                try
+                {
+                    if (client.Connected)
+                        client.Close();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error closing client connection: {ex.Message}");
+                }
+
                 _logger.LogInformation($"Client disconnected: {clientIP}:{clientPort}");
+            }
+        }
+
+        private async Task SendDataAcknowledgmentDirect(NetworkStream stream, string deviceId, CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Format: #dªdeviceIdªCS<LF>
+                using (var ms = new MemoryStream())
+                {
+                    // "#d" prefix
+                    ms.WriteByte(0x23); // #
+                    ms.WriteByte(0x64); // d
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Device ID bytes
+                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Calculate the checksum
+                    byte[] dataBytesSoFar = ms.ToArray();
+                    byte checksum = CalculateChecksum(dataBytesSoFar);
+                    ms.WriteByte(checksum);
+
+                    // String end (0xFD)
+                    ms.WriteByte(0xFD);
+
+                    // Line feed (0x0A)
+                    ms.WriteByte(0x0A);
+
+                    byte[] responseData = ms.ToArray();
+
+                    // Send the acknowledgment
+                    await stream.WriteAsync(responseData, 0, responseData.Length, stoppingToken);
+
+                    // Log the bytes and human-readable form
+                    _logger.LogInformation($"Sent data acknowledgment to device {deviceId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error sending direct data acknowledgment to device {deviceId}");
+                throw;
             }
         }
 
@@ -254,6 +349,59 @@ namespace DeviceDataCollector.Services
                 checksum += b;
             }
             return (byte)(checksum % 256);
+        }
+
+        private async Task SendSerialUpdateCommandDirect(NetworkStream stream, string currentSerialNumber, string newSerialNumber, CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Build the command byte-by-byte to ensure correct encoding
+                using (var ms = new MemoryStream())
+                {
+                    // "#i" prefix
+                    ms.WriteByte(0x23); // #
+                    ms.WriteByte(0x69); // i
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Current serial number bytes
+                    byte[] currentSerialBytes = Encoding.ASCII.GetBytes(currentSerialNumber);
+                    ms.Write(currentSerialBytes, 0, currentSerialBytes.Length);
+
+                    // Second separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // New serial number bytes
+                    byte[] newSerialBytes = Encoding.ASCII.GetBytes(newSerialNumber);
+                    ms.Write(newSerialBytes, 0, newSerialBytes.Length);
+
+                    // Third separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Calculate the checksum
+                    byte[] commandBytesSoFar = ms.ToArray();
+                    byte checksum = CalculateChecksum(commandBytesSoFar);
+                    byte[] checksumBytes = new byte[] { checksum };
+                    ms.Write(checksumBytes, 0, checksumBytes.Length);
+
+                    // String end (0xFD)
+                    ms.WriteByte(0xFD);
+
+                    // Line feed (0x0A)
+                    ms.WriteByte(0x0A);
+                    byte[] commandBytes = ms.ToArray();
+
+                    // Send the command
+                    await stream.WriteAsync(commandBytes, 0, commandBytes.Length, stoppingToken);
+                    _logger.LogInformation($"Sent serial update command to device {currentSerialNumber}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending direct serial update command");
+                throw;
+            }
         }
 
         private async Task SendSerialUpdateCommandAsync(TcpClient client, string currentSerialNumber, string newSerialNumber, CancellationToken stoppingToken)
@@ -319,7 +467,7 @@ namespace DeviceDataCollector.Services
             {
                 _logger.LogInformation($"Processing serial update response: {response}");
 
-                // Normalizuj separatore
+                // Normalize separators
                 string normalizedResponse = response
                     .Replace("?", "\u00AA")
                     .Replace("|", "\u00AA")
@@ -339,7 +487,7 @@ namespace DeviceDataCollector.Services
 
                 _logger.LogInformation($"Serial update response: {oldSerial} -> {newSerial}, Status: {status}");
 
-                // Ako je status "OK", ažuriraj serijski broj u bazi
+                // Only proceed if status is "OK"
                 if (status == "OK")
                 {
                     _logger.LogInformation($"Serial number change confirmed by device: {oldSerial} -> {newSerial}");
@@ -348,45 +496,89 @@ namespace DeviceDataCollector.Services
                     {
                         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                        // Ažuriraj Device tabelu
-                        var device = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == oldSerial);
-                        if (device != null)
+                        // First check if there's already a device with the new serial number
+                        var existingDeviceWithNewSerial = await dbContext.Devices
+                            .FirstOrDefaultAsync(d => d.SerialNumber == newSerial);
+
+                        if (existingDeviceWithNewSerial != null)
                         {
-                            _logger.LogInformation($"Updating device record in database: {oldSerial} -> {newSerial}");
-                            device.SerialNumber = newSerial;
-
-                            // Ažuriraj i CurrentDeviceStatus tabelu
-                            var currentStatus = await dbContext.CurrentDeviceStatuses
-                                .FirstOrDefaultAsync(s => s.DeviceId == oldSerial);
-
-                            if (currentStatus != null)
-                            {
-                                _logger.LogInformation($"Updating current status record: {oldSerial} -> {newSerial}");
-
-                                // Kreiraj novi status sa novim serijskim brojem
-                                var newStatus = new CurrentDeviceStatus
-                                {
-                                    DeviceId = newSerial,
-                                    Timestamp = currentStatus.Timestamp,
-                                    Status = currentStatus.Status,
-                                    AvailableData = currentStatus.AvailableData,
-                                    IPAddress = currentStatus.IPAddress,
-                                    Port = currentStatus.Port,
-                                    CheckSum = currentStatus.CheckSum,
-                                    StatusUpdateCount = currentStatus.StatusUpdateCount
-                                };
-
-                                // Ukloni stari status i dodaj novi
-                                dbContext.CurrentDeviceStatuses.Remove(currentStatus);
-                                dbContext.CurrentDeviceStatuses.Add(newStatus);
-                            }
-
-                            await dbContext.SaveChangesAsync();
-                            _logger.LogInformation("Database updated successfully");
+                            _logger.LogWarning($"Cannot update device: A device with serial number {newSerial} already exists.");
+                            return;
                         }
-                        else
+
+                        // Start a transaction to ensure all operations succeed or fail together
+                        using var transaction = await dbContext.Database.BeginTransactionAsync(stoppingToken);
+
+                        try
                         {
-                            _logger.LogWarning($"Device with serial number {oldSerial} not found in database");
+                            // Update Device table
+                            var device = await dbContext.Devices.FirstOrDefaultAsync(d => d.SerialNumber == oldSerial);
+                            if (device != null)
+                            {
+                                _logger.LogInformation($"Updating device record in database: {oldSerial} -> {newSerial}");
+                                device.SerialNumber = newSerial;
+
+                                // First check if a CurrentDeviceStatus with the new serial already exists and delete it if found
+                                var existingNewStatus = await dbContext.CurrentDeviceStatuses
+                                    .FirstOrDefaultAsync(s => s.DeviceId == newSerial);
+
+                                if (existingNewStatus != null)
+                                {
+                                    _logger.LogInformation($"Removing existing current status for {newSerial} to avoid conflicts");
+                                    dbContext.CurrentDeviceStatuses.Remove(existingNewStatus);
+                                    // Save changes to remove the existing status first
+                                    await dbContext.SaveChangesAsync(stoppingToken);
+                                }
+
+                                // Now check and update the current status for the old serial
+                                var currentStatus = await dbContext.CurrentDeviceStatuses
+                                    .FirstOrDefaultAsync(s => s.DeviceId == oldSerial);
+
+                                if (currentStatus != null)
+                                {
+                                    _logger.LogInformation($"Updating current status record: {oldSerial} -> {newSerial}");
+
+                                    // Update the existing record instead of creating a new one
+                                    currentStatus.DeviceId = newSerial;
+
+                                    // Save the changes
+                                    await dbContext.SaveChangesAsync(stoppingToken);
+
+                                    // Create a system notification
+                                    var notification = new SystemNotification
+                                    {
+                                        Type = "SerialNumberUpdate",
+                                        Message = $"Serial number successfully updated from {oldSerial} to {newSerial}",
+                                        Timestamp = DateTime.Now,
+                                        Read = false,
+                                        RelatedEntityId = device.Id.ToString()
+                                    };
+
+                                    dbContext.SystemNotifications.Add(notification);
+                                }
+                                else
+                                {
+                                    _logger.LogWarning($"No current status found for device {oldSerial}");
+                                }
+
+                                // Save all remaining changes (device update and notification)
+                                await dbContext.SaveChangesAsync(stoppingToken);
+
+                                // Commit the transaction
+                                await transaction.CommitAsync(stoppingToken);
+
+                                _logger.LogInformation("Database updated successfully");
+                            }
+                            else
+                            {
+                                _logger.LogWarning($"Device with serial number {oldSerial} not found in database");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // If anything fails, roll back the transaction
+                            await transaction.RollbackAsync(stoppingToken);
+                            _logger.LogError(ex, $"Error updating database for serial number change: {oldSerial} -> {newSerial}");
                         }
                     }
                 }
@@ -398,6 +590,49 @@ namespace DeviceDataCollector.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error handling serial update response");
+            }
+        }
+
+        private async Task SendStatusAcknowledgmentDirect(NetworkStream stream, string deviceId, CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Format: #AªdeviceIdªS<LF>
+                using (var ms = new MemoryStream())
+                {
+                    // "#A" prefix
+                    ms.WriteByte(0x23); // #
+                    ms.WriteByte(0x41); // A
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Device ID bytes
+                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                    // Second separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // "S" (status acknowledgment)
+                    ms.WriteByte(0x53); // S
+
+                    // Line feed (0x0A)
+                    ms.WriteByte(0x0A);
+
+                    byte[] responseData = ms.ToArray();
+
+                    // Send the acknowledgment
+                    await stream.WriteAsync(responseData, 0, responseData.Length, stoppingToken);
+
+                    // Log the data
+                    _logger.LogInformation($"Sent status acknowledgment to device {deviceId}: #Aª{deviceId}ªS");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error sending direct status acknowledgment to device {deviceId}");
+                throw;
             }
         }
 
@@ -651,7 +886,7 @@ namespace DeviceDataCollector.Services
             }
         }
 
-        private async Task CheckAndSyncDeviceTimeAsync(DeviceStatus status)
+        private async Task<bool> CheckAndSyncDeviceTimeAsync(DeviceStatus status)
         {
             try
             {
@@ -673,25 +908,84 @@ namespace DeviceDataCollector.Services
                     _logger.LogInformation($"Time difference with device {status.DeviceId} is {timeDifference} seconds. " +
                                           $"Sending time sync command automatically.");
 
-                    // Get TcpClient from current session
-                    using var client = _activeClients.GetOrDefault(status.DeviceId);
-                    if (client != null && client.Connected)
-                    {
-                        // Format time as required (DDMMYYYYHHMM)
-                        string dateTimeFormat = serverTime.ToString("ddMMyyyyHHmm");
+                    // Format time as required (DDMMYYYYHHMM)
+                    string dateTimeFormat = serverTime.ToString("ddMMyyyyHHmm");
 
-                        // Send time sync command
-                        await SendTimeSyncCommandAsync(client, status.DeviceId, dateTimeFormat, CancellationToken.None);
-                    }
-                    else
-                    {
-                        _logger.LogWarning($"Cannot sync time for device {status.DeviceId}: No active connection");
-                    }
+                    // Rather than send immediately, queue it to be sent by the main communication loop
+                    _pendingTimeSync[status.DeviceId] = dateTimeFormat;
+                    return true;
                 }
+
+                return false;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error checking device time synchronization for {status.DeviceId}");
+                return false;
+            }
+        }
+
+        private async Task SendTimeSyncCommandDirect(NetworkStream stream, string deviceId, string dateTimeFormat, CancellationToken stoppingToken)
+        {
+            try
+            {
+                // Delay for 500ms before sending the command (shorter delay for time sync)
+                await Task.Delay(500, stoppingToken);
+
+                // Build the command byte-by-byte to ensure correct encoding
+                using (var ms = new MemoryStream())
+                {
+                    // "#t" prefix
+                    ms.WriteByte(0x23); // #
+                    ms.WriteByte(0x74); // t
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Device ID bytes
+                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Date time bytes (format: DDMMYYYYHHMM)
+                    byte[] dateTimeBytes = Encoding.ASCII.GetBytes(dateTimeFormat);
+                    ms.Write(dateTimeBytes, 0, dateTimeBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // "N" character
+                    ms.WriteByte(0x4E); // N
+
+                    // Calculate the checksum
+                    byte[] commandBytesSoFar = ms.ToArray();
+                    byte checksum = CalculateChecksum(commandBytesSoFar);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Checksum byte
+                    ms.WriteByte(checksum);
+
+                    // String end (0xFD)
+                    ms.WriteByte(0xFD);
+
+                    // Line feed (0x0A)
+                    ms.WriteByte(0x0A);
+
+                    byte[] commandBytes = ms.ToArray();
+
+                    // Send the command
+                    await stream.WriteAsync(commandBytes, 0, commandBytes.Length, stoppingToken);
+                    _logger.LogInformation($"Sent direct time sync command to device {deviceId} with time {dateTimeFormat}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error sending direct time sync command to device {deviceId}");
+                throw;
             }
         }
         private async Task SendTimeSyncCommandAsync(TcpClient client, string deviceId, string dateTimeFormat, CancellationToken stoppingToken)
