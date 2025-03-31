@@ -47,7 +47,14 @@ namespace DeviceDataCollector.Controllers
         // GET: Users/Create
         public IActionResult Create()
         {
-            return View();
+            // Create a fresh view model with default values
+            var model = new UserCreateViewModel
+            {
+                // Set Role to "User" by default, but leave other fields empty
+                Role = "User"
+            };
+
+            return View(model);
         }
 
         // POST: Users/Create
@@ -55,6 +62,13 @@ namespace DeviceDataCollector.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(UserCreateViewModel model)
         {
+            // Check if username already exists
+            if (await _context.Users.AnyAsync(u => u.Username == model.Username))
+            {
+                ModelState.AddModelError("Username", "This username is already taken. Please choose a different one.");
+                return View(model);
+            }
+
             if (ModelState.IsValid)
             {
                 var user = new User
@@ -189,7 +203,7 @@ namespace DeviceDataCollector.Controllers
                 return NotFound();
             }
 
-            // Don't allow deleting own account
+            // Check if user is trying to delete their own account
             if (User.Identity.Name == user.Username)
             {
                 TempData["ErrorMessage"] = "You cannot delete your own account.";
