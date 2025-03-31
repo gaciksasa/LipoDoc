@@ -443,39 +443,6 @@ namespace DeviceDataCollector.Controllers
             return _context.Devices.Any(e => e.Id == id);
         }
 
-        [HttpPost]
-        [Authorize(Policy = "RequireAdminRole")]
-        public async Task<IActionResult> SendCommand(int id, string command)
-        {
-            try
-            {
-                var device = await _context.Devices.FindAsync(id);
-                if (device == null)
-                {
-                    return NotFound();
-                }
-
-                // Get the TCP service to send the command
-                var tcpService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
-
-                // Call our new method - note that we're passing temporary values just to reuse the function
-                // This is not ideal but will fix the compilation error
-                var (success, response, _) = await tcpService.UpdateSerialNumberAsync(
-                    device.SerialNumber,
-                    device.SerialNumber); // Just passing the same SN as both parameters
-
-                TempData["CommandResponse"] = response;
-                TempData["SuccessMessage"] = success ? "Command sent successfully." : "Command failed.";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending command to device");
-                TempData["ErrorMessage"] = $"Error sending command: {ex.Message}";
-            }
-
-            return RedirectToAction(nameof(Details), new { id = id });
-        }
-
     }
 
     // Helper class for pagination
