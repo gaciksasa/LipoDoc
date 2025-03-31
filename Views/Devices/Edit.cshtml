@@ -46,9 +46,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="NewSerialNumber" class="form-label">New Serial Number</label>
+                            <label for="NewSerialNumber" class="form-label">New Serial Number (Optional)</label>
                             <input name="NewSerialNumber" id="NewSerialNumber" class="form-control" />
-                            <div class="form-text">Enter a new serial number to update the device via the TCP server</div>
+                            <div class="form-text">Leave blank to keep the current serial number. Only provide a value to update the device via the TCP server.</div>
                             <span class="text-danger">@Html.ValidationMessage("NewSerialNumber")</span>
                         </div>
 

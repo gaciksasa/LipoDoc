@@ -178,6 +178,12 @@ namespace DeviceDataCollector.Controllers
             device.RegisteredDate = existingDevice.RegisteredDate;
             device.LastConnectionTime = existingDevice.LastConnectionTime;
 
+            // IMPORTANT: Remove validation error for NewSerialNumber if it's empty
+            if (string.IsNullOrEmpty(NewSerialNumber))
+            {
+                ModelState.Remove("NewSerialNumber");
+            }
+
             // Check if a new serial number was provided
             bool serialNumberChangeRequested = !string.IsNullOrWhiteSpace(NewSerialNumber) &&
                                               NewSerialNumber != existingDevice.SerialNumber;
