@@ -496,16 +496,6 @@ namespace DeviceDataCollector.Services
                     {
                         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                        // First check if there's already a device with the new serial number
-                        var existingDeviceWithNewSerial = await dbContext.Devices
-                            .FirstOrDefaultAsync(d => d.SerialNumber == newSerial);
-
-                        if (existingDeviceWithNewSerial != null)
-                        {
-                            _logger.LogWarning($"Cannot update device: A device with serial number {newSerial} already exists.");
-                            return;
-                        }
-
                         // Start a transaction to ensure all operations succeed or fail together
                         using var transaction = await dbContext.Database.BeginTransactionAsync(stoppingToken);
 
@@ -516,58 +506,111 @@ namespace DeviceDataCollector.Services
                             if (device != null)
                             {
                                 _logger.LogInformation($"Updating device record in database: {oldSerial} -> {newSerial}");
-                                device.SerialNumber = newSerial;
 
-                                // First check if a CurrentDeviceStatus with the new serial already exists and delete it if found
-                                var existingNewStatus = await dbContext.CurrentDeviceStatuses
-                                    .FirstOrDefaultAsync(s => s.DeviceId == newSerial);
+                                // Store device information before updating
+                                int deviceId = device.Id;
 
-                                if (existingNewStatus != null)
-                                {
-                                    _logger.LogInformation($"Removing existing current status for {newSerial} to avoid conflicts");
-                                    dbContext.CurrentDeviceStatuses.Remove(existingNewStatus);
-                                    // Save changes to remove the existing status first
-                                    await dbContext.SaveChangesAsync(stoppingToken);
-                                }
-
-                                // Now check and update the current status for the old serial
+                                // Handle CurrentDeviceStatus separately
                                 var currentStatus = await dbContext.CurrentDeviceStatuses
                                     .FirstOrDefaultAsync(s => s.DeviceId == oldSerial);
 
+                                // If we have an existing current status
                                 if (currentStatus != null)
                                 {
-                                    _logger.LogInformation($"Updating current status record: {oldSerial} -> {newSerial}");
+                                    _logger.LogInformation($"Found current status for device {oldSerial}");
 
-                                    // Update the existing record instead of creating a new one
-                                    currentStatus.DeviceId = newSerial;
-
-                                    // Save the changes
-                                    await dbContext.SaveChangesAsync(stoppingToken);
-
-                                    // Create a system notification
-                                    var notification = new SystemNotification
+                                    // Store current status data
+                                    var statusData = new
                                     {
-                                        Type = "SerialNumberUpdate",
-                                        Message = $"Serial number successfully updated from {oldSerial} to {newSerial}",
-                                        Timestamp = DateTime.Now,
-                                        Read = false,
-                                        RelatedEntityId = device.Id.ToString()
+                                        currentStatus.Timestamp,
+                                        currentStatus.Status,
+                                        currentStatus.AvailableData,
+                                        currentStatus.IPAddress,
+                                        currentStatus.Port,
+                                        currentStatus.CheckSum,
+                                        currentStatus.StatusUpdateCount
                                     };
 
-                                    dbContext.SystemNotifications.Add(notification);
-                                }
-                                else
-                                {
-                                    _logger.LogWarning($"No current status found for device {oldSerial}");
+                                    // Remove the current status record (we can't update primary key)
+                                    _logger.LogInformation($"Removing current status record for {oldSerial}");
+                                    dbContext.CurrentDeviceStatuses.Remove(currentStatus);
+                                    await dbContext.SaveChangesAsync(stoppingToken);
+
+                                    // Check if a record with new serial number already exists
+                                    var existingNewStatus = await dbContext.CurrentDeviceStatuses
+                                        .FirstOrDefaultAsync(s => s.DeviceId == newSerial);
+
+                                    if (existingNewStatus != null)
+                                    {
+                                        _logger.LogInformation($"Found existing status for new serial {newSerial}, updating it");
+                                        existingNewStatus.Timestamp = statusData.Timestamp;
+                                        existingNewStatus.Status = statusData.Status;
+                                        existingNewStatus.AvailableData = statusData.AvailableData;
+                                        existingNewStatus.IPAddress = statusData.IPAddress;
+                                        existingNewStatus.Port = statusData.Port;
+                                        existingNewStatus.CheckSum = statusData.CheckSum;
+                                        existingNewStatus.StatusUpdateCount += statusData.StatusUpdateCount;
+                                    }
+                                    else
+                                    {
+                                        // Create a new record with the new DeviceId but the same data
+                                        _logger.LogInformation($"Creating new current status record for {newSerial}");
+                                        var newCurrentStatus = new CurrentDeviceStatus
+                                        {
+                                            DeviceId = newSerial,
+                                            Timestamp = statusData.Timestamp,
+                                            Status = statusData.Status,
+                                            AvailableData = statusData.AvailableData,
+                                            IPAddress = statusData.IPAddress,
+                                            Port = statusData.Port,
+                                            CheckSum = statusData.CheckSum,
+                                            StatusUpdateCount = statusData.StatusUpdateCount
+                                        };
+                                        dbContext.CurrentDeviceStatuses.Add(newCurrentStatus);
+                                    }
+
+                                    await dbContext.SaveChangesAsync(stoppingToken);
                                 }
 
-                                // Save all remaining changes (device update and notification)
+                                // Now we can update the device
+                                device.SerialNumber = newSerial;
+                                await dbContext.SaveChangesAsync(stoppingToken);
+
+                                // Update historical records
+                                try
+                                {
+                                    // Use raw SQL to update DeviceStatuses and DonationsData
+                                    await dbContext.Database.ExecuteSqlRawAsync(
+                                        $"UPDATE DeviceStatuses SET DeviceId = '{newSerial}' WHERE DeviceId = '{oldSerial}'",
+                                        stoppingToken);
+
+                                    await dbContext.Database.ExecuteSqlRawAsync(
+                                        $"UPDATE DonationsData SET DeviceId = '{newSerial}' WHERE DeviceId = '{oldSerial}'",
+                                        stoppingToken);
+
+                                    _logger.LogInformation($"Updated historical records for device {oldSerial} -> {newSerial}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, $"Error updating historical records: {ex.Message}");
+                                }
+
+                                // Create a system notification
+                                var notification = new SystemNotification
+                                {
+                                    Type = "SerialNumberUpdate",
+                                    Message = $"Serial number successfully updated from {oldSerial} to {newSerial}",
+                                    Timestamp = DateTime.Now,
+                                    Read = false,
+                                    RelatedEntityId = deviceId.ToString()
+                                };
+
+                                dbContext.SystemNotifications.Add(notification);
                                 await dbContext.SaveChangesAsync(stoppingToken);
 
                                 // Commit the transaction
                                 await transaction.CommitAsync(stoppingToken);
-
-                                _logger.LogInformation("Database updated successfully");
+                                _logger.LogInformation($"Successfully completed serial number update from {oldSerial} to {newSerial}");
                             }
                             else
                             {
@@ -1211,6 +1254,28 @@ namespace DeviceDataCollector.Services
 
                 if (existingDevice == null)
                 {
+                    // Check if this is a device that has been renamed
+                    var notification = await dbContext.SystemNotifications
+                        .Where(n => n.Type == "SerialNumberUpdate" && n.Message.Contains($"to {deviceId}"))
+                        .OrderByDescending(n => n.Timestamp)
+                        .FirstOrDefaultAsync();
+
+                    if (notification != null)
+                    {
+                        _logger.LogInformation($"This appears to be a renamed device: {deviceId}");
+
+                        // Just update the last connection time of the existing device
+                        existingDevice = await dbContext.Devices.FindAsync(int.Parse(notification.RelatedEntityId));
+                        if (existingDevice != null)
+                        {
+                            _logger.LogInformation($"Found existing device with ID {notification.RelatedEntityId}, updating last connection time");
+                            existingDevice.LastConnectionTime = DateTime.Now;
+                            existingDevice.IsActive = true;
+                            await dbContext.SaveChangesAsync();
+                            return;
+                        }
+                    }
+
                     // Register a new device
                     _logger.LogInformation($"Registering new device: {deviceId}");
                     var device = new Device

@@ -64,6 +64,8 @@ namespace DeviceDataCollector.Controllers
                 ViewBag.HasSerialUpdateNotifications = false;
             }
 
+            // Get distinct devices to avoid duplicates with old/new serial numbers
+            // We achieve this by getting the latest set of devices which should have updated serial numbers
             var devices = await _context.Devices
                 .OrderByDescending(d => d.LastConnectionTime)
                 .ToListAsync();
@@ -154,8 +156,6 @@ namespace DeviceDataCollector.Controllers
             return View(device);
         }
 
-        // Replace the existing Edit POST method in DevicesController.cs with this:
-
         // POST: Devices/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -181,6 +181,19 @@ namespace DeviceDataCollector.Controllers
             // Check if a new serial number was provided
             bool serialNumberChangeRequested = !string.IsNullOrWhiteSpace(NewSerialNumber) &&
                                               NewSerialNumber != existingDevice.SerialNumber;
+
+            // Check if the new serial already exists in another device
+            if (serialNumberChangeRequested)
+            {
+                var duplicateDevice = await _context.Devices
+                    .FirstOrDefaultAsync(d => d.SerialNumber == NewSerialNumber && d.Id != id);
+
+                if (duplicateDevice != null)
+                {
+                    ModelState.AddModelError("NewSerialNumber", "This serial number is already assigned to another device.");
+                    return View(device);
+                }
+            }
 
             if (ModelState.IsValid)
             {
@@ -211,18 +224,21 @@ namespace DeviceDataCollector.Controllers
 
                         // Add the notification
                         AddSerialChangeQueuedNotification(existingDevice.SerialNumber, NewSerialNumber);
+
+                        // Keep the existing serial number until device confirms the change
                         device.SerialNumber = existingDevice.SerialNumber;
+
+                        TempData["SuccessMessage"] = $"Serial number change request from {existingDevice.SerialNumber} to {NewSerialNumber} has been queued. The device will be updated when it confirms the change. Once the device updates, refresh the page to see the changes.";
+                    }
+                    else
+                    {
+                        TempData["SuccessMessage"] = "Device information updated successfully.";
                     }
 
                     // Update the device in the database
                     _context.Update(device);
                     await _context.SaveChangesAsync();
                     _logger.LogInformation($"Device {device.SerialNumber} updated by {User.Identity.Name}");
-
-                    if (!serialNumberChangeRequested)
-                    {
-                        TempData["SuccessMessage"] = "Device information updated successfully.";
-                    }
 
                     return RedirectToAction(nameof(Index));
                 }
