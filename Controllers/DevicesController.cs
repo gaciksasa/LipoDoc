@@ -125,7 +125,10 @@ namespace DeviceDataCollector.Controllers
                 };
 
                 ViewBag.LatestStatus = latestStatus;
-                ViewBag.StatusUpdateCount = currentStatus.StatusUpdateCount; // Add update count for informational purposes
+                ViewBag.StatusUpdateCount = currentStatus.StatusUpdateCount;
+
+                bool isInSetupMode = ViewBag.LatestStatus != null && ViewBag.LatestStatus.Status == 3;
+                ViewBag.IsInSetupMode = isInSetupMode;
             }
 
             // Get count of readings for this device
@@ -453,19 +456,31 @@ namespace DeviceDataCollector.Controllers
                 return NotFound();
             }
 
+            // Check if device is in setup mode
+            var currentStatus = await _context.CurrentDeviceStatuses
+                .FirstOrDefaultAsync(s => s.DeviceId == device.SerialNumber);
+
+            if (currentStatus == null || currentStatus.Status != 3)
+            {
+                TempData["ErrorMessage"] = "Device is not in setup mode. Setup request can only be sent when device status is 3.";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+
             var commService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
             bool success = commService.RequestDeviceSetup(device.SerialNumber);
 
             if (success)
             {
-                TempData["SuccessMessage"] = "Setup request has been sent to the device. The setup will be displayed when the device responds.";
+                // Set a flag to indicate that we just requested a setup
+                TempData["SetupRequested"] = true;
+                // Redirect directly to the Setup page
+                return RedirectToAction(nameof(Setup), new { id = id });
             }
             else
             {
                 TempData["ErrorMessage"] = "Failed to send setup request to the device.";
+                return RedirectToAction(nameof(Details), new { id = id });
             }
-
-            return RedirectToAction(nameof(Details), new { id = id });
         }
 
         // GET: Devices/Setup/5
@@ -500,6 +515,13 @@ namespace DeviceDataCollector.Controllers
 
                 if (tableExists)
                 {
+                    // If we just sent a request to the device, wait a moment for the response
+                    if (TempData["SetupRequested"] != null)
+                    {
+                        // Wait briefly to allow device to respond
+                        await Task.Delay(1500);
+                    }
+
                     // Try to get the setup from the database
                     setup = await _context.DeviceSetups
                         .Where(s => s.DeviceId == device.SerialNumber)

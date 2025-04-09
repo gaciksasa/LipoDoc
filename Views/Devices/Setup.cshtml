@@ -19,6 +19,32 @@
         </div>
     </div>
 
+    @if (TempData["SetupRequested"] != null)
+    {
+        <div class="alert alert-info d-flex align-items-center" id="setupLoadingAlert">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div>
+                Waiting for device setup response... This may take a few moments.
+            </div>
+        </div>
+
+        <script>
+            // Auto-refresh the page a few times to check for new setup data
+            let refreshCount = 0;
+            const refreshInterval = setInterval(function() {
+                refreshCount++;
+                if (refreshCount >= 5) { // Try 5 times (10 seconds total)
+                    clearInterval(refreshInterval);
+                    $("#setupLoadingAlert").html('<div class="alert alert-warning">Device has not responded with setup information. You may need to try again.</div>');
+                } else {
+                    location.reload();
+                }
+            }, 2000); // Check every 2 seconds
+        </script>
+    }
+
     <div class="mb-3">
         <div class="d-flex justify-content-between align-items-center">
             <h1>Device Setup</h1>
@@ -269,24 +295,24 @@
                                         "LOT Number",
                                         "Type 5",
                                         "Type 6"
-                                                        };
+                                                                            };
 
                                     @foreach (var config in Model.BarcodeConfigs)
                                     {
-                                                <tr>
-                                                    <td>@(config.Index < types.Length ? types[config.Index] : $"Type {config.Index + 1}")</td>
-                                                    <td>@config.MinLength</td>
-                                                    <td>@config.MaxLength</td>
-                                                    <td>@(String.IsNullOrEmpty(config.StartCode) ? "-" : config.StartCode)</td>
-                                                    <td>@(String.IsNullOrEmpty(config.StopCode) ? "-" : config.StopCode)</td>
-                                                </tr>
+                                                        <tr>
+                                                            <td>@(config.Index < types.Length ? types[config.Index] : $"Type {config.Index + 1}")</td>
+                                                            <td>@config.MinLength</td>
+                                                            <td>@config.MaxLength</td>
+                                                            <td>@(String.IsNullOrEmpty(config.StartCode) ? "-" : config.StartCode)</td>
+                                                            <td>@(String.IsNullOrEmpty(config.StopCode) ? "-" : config.StopCode)</td>
+                                                        </tr>
                                     }
                                 }
                                 else
                                 {
-                                        <tr>
-                                            <td colspan="5" class="text-center">No barcode configurations available</td>
-                                        </tr>
+                                            <tr>
+                                                <td colspan="5" class="text-center">No barcode configurations available</td>
+                                            </tr>
                                 }
                             </tbody>
                         </table>
@@ -339,9 +365,7 @@
 
     <!-- Raw Response (Expandable) -->
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-            <i class="bi bi-code-slash"></i> Raw Response Data
-        </div>
+        <div class="card-header bg-primary text-white">Raw Response Data</div>
         <div class="card-body">
             <pre class="bg-light p-3 rounded"><code>@Model.RawResponse</code></pre>
         </div>

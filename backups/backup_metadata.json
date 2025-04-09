@@ -1,24 +1,17 @@
 [
   {
+    "FileName": "devicedata_20250313_122300.sql.gz",
+    "Description": "Scheduled automatic backup",
+    "Database": "devicedata",
+    "FileSize": 2919,
+    "CreatedAt": "2025-03-13T12:23:00.0708594+01:00"
+  },
+  {
     "FileName": "devicedata_20250313_122200.sql.gz",
     "Description": "Scheduled automatic backup",
     "Database": "devicedata",
     "FileSize": 2918,
     "CreatedAt": "2025-03-13T12:22:00.2129413+01:00"
-  },
-  {
-    "FileName": "devicedata_20250313_122100.sql.gz",
-    "Description": "Scheduled automatic backup",
-    "Database": "devicedata",
-    "FileSize": 2919,
-    "CreatedAt": "2025-03-13T12:21:00.1077651+01:00"
-  },
-  {
-    "FileName": "devicedata_20250313_121900.sql.gz",
-    "Description": "Scheduled automatic backup",
-    "Database": "devicedata",
-    "FileSize": 2918,
-    "CreatedAt": "2025-03-13T12:19:00.5496258+01:00"
   },
   {
     "FileName": "devicedata_20250313_091953.sql.gz",
@@ -28,10 +21,10 @@
     "CreatedAt": "2025-03-13T09:19:53.906314+01:00"
   },
   {
-    "FileName": "devicedata_20250313_122300.sql.gz",
-    "Description": "Scheduled automatic backup",
+    "FileName": "devicedata_20250409_111714.sql.gz",
+    "Description": null,
     "Database": "devicedata",
-    "FileSize": 2919,
-    "CreatedAt": "2025-03-13T12:23:00.0708594+01:00"
+    "FileSize": 7795,
+    "CreatedAt": "2025-04-09T11:17:14.6875974+02:00"
   }
 ]

@@ -126,6 +126,14 @@
                         <div>
                             @if (User.IsInRole("Admin"))
                             {
+                                <form asp-action="RequestSetup" method="post" class="d-inline" id="setupRequestForm">
+                                    <input type="hidden" name="id" value="@Model.Id" />
+                                    <button type="submit" class="btn btn-info" id="setupRequestButton"
+                                            @(ViewBag.IsInSetupMode ? "" : "disabled")>
+                                        <i class="bi bi-arrow-repeat"></i> <span id="setupButtonText">View Device Setup</span>
+                                        <span class="spinner-border spinner-border-sm ms-1 d-none" id="setupSpinner" role="status" aria-hidden="true"></span>
+                                    </button>
+                                </form>
                                 <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-info">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>
@@ -135,6 +143,14 @@
                             }
                         </div>
                     </div>
+                    @if (!ViewBag.IsInSetupMode && ViewBag.LatestStatus != null)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            Device is not in setup mode. Setup request is only available when device status is in Setup Mode (3).
+                            Current status: @ViewBag.LatestStatus.Status
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -230,25 +246,37 @@
                     </div>
                 </div>
             </div>
-
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Device Management</h5>
-                </div>
-                <div class="card-footer">
-                    <div class="d-flex">
-                        <form asp-action="RequestSetup" method="post" class="d-grid">
-                            <input type="hidden" name="id" value="@Model.Id" />
-                            <button type="submit" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-repeat"></i> Request Device Setup
-                            </button>
-                        </form>
-                        <a asp-action="Setup" asp-route-id="@Model.Id" class="btn btn-info">
-                            <i class="bi bi-gear"></i> View Device Setup
-                        </a>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+        <script>
+            // Set up the setup request form submission
+            $(document).ready(function() {
+                $("#setupRequestForm").on("submit", function(e) {
+                    // Show the spinner and update text
+                    $("#setupButtonText").text("Requesting Setup...");
+                    $("#setupSpinner").removeClass("d-none");
+                    $("#setupRequestButton").attr("disabled", true);
+                });
+
+                // Add tooltip to disabled button to explain why it's disabled
+                if ($("#setupRequestButton").is(":disabled")) {
+                    $("#setupRequestButton").attr("title", "Device must be in setup mode (status 3) to request setup");
+
+                    // Optional: Add Bootstrap tooltip initialization if you want a nicer tooltip
+                    // Make sure Bootstrap JS is included for this to work
+                    $("#setupRequestButton").tooltip();
+
+                    // Handle clicks on disabled button to show a message
+                    $("#setupRequestButton").on("click", function(e) {
+                        if ($(this).is(":disabled")) {
+                            e.preventDefault();
+                            alert("Device must be in setup mode (status 3) to request setup");
+                        }
+                    });
+                }
+            });
+        </script>
+}
