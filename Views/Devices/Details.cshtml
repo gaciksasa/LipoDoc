@@ -19,6 +19,20 @@
         </div>
     </div>
 
+    @if (TempData["InfoMessage"] != null)
+    {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> @TempData["InfoMessage"]
+            </div>
+    }
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+            </div>
+    }
+
     <div class="row">
         <div class="col-md-6">
             <div class="card mb-4">
@@ -158,6 +172,9 @@
                                     case 2:
                                         <span class="badge bg-success">Process Completed</span>
                                         break;
+                                    case 3:
+                                        <span class="badge bg-success">Setup Mode</span>
+                                        break;
                                     default:
                                         <span class="badge bg-warning">Unknown (@latestStatus.Status)</span>
                                         break;
@@ -209,6 +226,25 @@
                     <div class="d-grid gap-2">
                         <a asp-action="Donations" asp-route-id="@Model.Id" class="btn btn-info">
                             <i class="bi bi-droplet"></i> View Donations
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Device Management</h5>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex">
+                        <form asp-action="RequestSetup" method="post" class="d-grid">
+                            <input type="hidden" name="id" value="@Model.Id" />
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-repeat"></i> Request Device Setup
+                            </button>
+                        </form>
+                        <a asp-action="Setup" asp-route-id="@Model.Id" class="btn btn-info">
+                            <i class="bi bi-gear"></i> View Device Setup
                         </a>
                     </div>
                 </div>

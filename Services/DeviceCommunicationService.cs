@@ -128,5 +128,32 @@ namespace DeviceDataCollector.Services
                 return false;
             }
         }
+
+        /// <summary>
+        /// Requests the device setup configuration
+        /// </summary>
+        /// <param name="serialNumber">The serial number of the device</param>
+        /// <returns>True if request was queued successfully</returns>
+        public bool RequestDeviceSetup(string serialNumber)
+        {
+            if (string.IsNullOrEmpty(serialNumber))
+            {
+                _logger.LogWarning("Cannot request setup for null or empty serial number");
+                return false;
+            }
+
+            _logger.LogInformation($"Queuing setup request for device: {serialNumber}");
+
+            try
+            {
+                // Queue the request in the TCPServerService
+                return TCPServerService.QueueSetupRequest(serialNumber);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error queuing setup request for device {serialNumber}");
+                return false;
+            }
+        }
     }
 }

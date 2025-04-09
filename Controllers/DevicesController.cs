@@ -443,6 +443,106 @@ namespace DeviceDataCollector.Controllers
             return _context.Devices.Any(e => e.Id == id);
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestSetup(int id)
+        {
+            var device = await _context.Devices.FindAsync(id);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            var commService = HttpContext.RequestServices.GetRequiredService<DeviceDataCollector.Services.DeviceCommunicationService>();
+            bool success = commService.RequestDeviceSetup(device.SerialNumber);
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = "Setup request has been sent to the device. The setup will be displayed when the device responds.";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Failed to send setup request to the device.";
+            }
+
+            return RedirectToAction(nameof(Details), new { id = id });
+        }
+
+        // GET: Devices/Setup/5
+        public async Task<IActionResult> Setup(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var device = await _context.Devices.FindAsync(id);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            DeviceSetup? setup = null;
+            try
+            {
+                // Check if the table exists first
+                bool tableExists = true;
+                try
+                {
+                    // Try to query the table - if it doesn't exist, an exception will be thrown
+                    await _context.Database.ExecuteSqlRawAsync("SELECT 1 FROM DeviceSetups LIMIT 1");
+                }
+                catch (Exception)
+                {
+                    tableExists = false;
+                    _logger.LogWarning("DeviceSetups table doesn't exist yet. Migrations need to be applied.");
+                }
+
+                if (tableExists)
+                {
+                    // Try to get the setup from the database
+                    setup = await _context.DeviceSetups
+                        .Where(s => s.DeviceId == device.SerialNumber)
+                        .OrderByDescending(s => s.Timestamp)
+                        .FirstOrDefaultAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving device setup. The table might not exist yet.");
+                // Continue with null setup
+            }
+
+            if (setup == null)
+            {
+                TempData["InfoMessage"] = "No setup information available for this device yet. Click 'Request Setup' to request it from the device.";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+
+            // Deserialize JSON data for display
+            try
+            {
+                if (!string.IsNullOrEmpty(setup.ProfilesJson))
+                {
+                    setup.Profiles = System.Text.Json.JsonSerializer.Deserialize<List<DeviceProfile>>(setup.ProfilesJson)
+                                     ?? new List<DeviceProfile>();
+                }
+
+                if (!string.IsNullOrEmpty(setup.BarcodesJson))
+                {
+                    setup.BarcodeConfigs = System.Text.Json.JsonSerializer.Deserialize<List<BarcodeConfig>>(setup.BarcodesJson)
+                                           ?? new List<BarcodeConfig>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deserializing JSON data for device setup");
+            }
+
+            ViewBag.Device = device;
+            return View(setup);
+        }
+
     }
 
     // Helper class for pagination

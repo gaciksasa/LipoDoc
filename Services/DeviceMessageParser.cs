@@ -21,6 +21,7 @@ namespace DeviceDataCollector.Services
             AcknowledgeMessage, // #A
             NoMoreDataMessage,  // #U
             SerialUpdateResponseMessage, // #I 
+            SetupResponseMessage, // #R
             Unknown
         }
 
@@ -101,6 +102,15 @@ namespace DeviceDataCollector.Services
                         }
                         return responseResult;
 
+                    case MessageType.SetupResponseMessage:
+                        _logger.LogInformation($"Setup response received: {message}");
+                        var setupResult = ParseSetupResponse(message, ipAddress, port);
+                        if (setupResult != null)
+                        {
+                            _logger.LogInformation($"Parsed setup response: DeviceId={setupResult.DeviceId}, SW={setupResult.SoftwareVersion}, HW={setupResult.HardwareVersion}");
+                        }
+                        return setupResult;
+
                     default:
                         _logger.LogWarning($"Unknown message format received: {message}");
                         return null;
@@ -123,7 +133,7 @@ namespace DeviceDataCollector.Services
             return cleaned;
         }
 
-        private MessageType DetermineMessageType(string message)
+        public MessageType DetermineMessageType(string message)
         {
             if (message.StartsWith("#S"))
                 return MessageType.StatusMessage;
@@ -137,6 +147,8 @@ namespace DeviceDataCollector.Services
                 return MessageType.NoMoreDataMessage;
             else if (message.StartsWith("#I"))
                 return MessageType.SerialUpdateResponseMessage;
+            else if (message.StartsWith("#R"))
+                return MessageType.SetupResponseMessage;
             else
                 return MessageType.Unknown;
         }
@@ -376,6 +388,49 @@ namespace DeviceDataCollector.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Error parsing serial update response: {message}");
+                return null;
+            }
+        }
+
+        public class SetupResponse
+        {
+            public string DeviceId { get; set; }
+            public string SoftwareVersion { get; set; }
+            public string HardwareVersion { get; set; }
+            public string SetupData { get; set; }
+            public string RawResponse { get; set; }
+        }
+
+        private SetupResponse ParseSetupResponse(string message, string ipAddress, int port)
+        {
+            try
+            {
+                // Format is documented in the protocol
+                // This is a complex message with many parts, so we'll keep it simple and
+                // store the raw message for detailed parsing later
+
+                // Normalize separators
+                message = message.Replace("?", "ª").Replace("|", "ª").Replace("*", "ª");
+                var parts = message.Split('ª');
+
+                if (parts.Length < 4)
+                {
+                    _logger.LogWarning($"Invalid setup response format: {message}");
+                    return null;
+                }
+
+                return new SetupResponse
+                {
+                    DeviceId = parts[1],
+                    SoftwareVersion = parts[2],
+                    HardwareVersion = parts[3],
+                    SetupData = message,
+                    RawResponse = message
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error parsing setup response: {message}");
                 return null;
             }
         }

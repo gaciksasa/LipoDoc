@@ -22,6 +22,7 @@ namespace DeviceDataCollector.Services
         private static readonly ConcurrentDictionary<string, string> _pendingSerialChanges = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentDictionary<string, TcpClient> _activeClients = new ConcurrentDictionary<string, TcpClient>();
         private static readonly ConcurrentDictionary<string, string> _pendingTimeSync = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, bool> _pendingSetupRequests = new ConcurrentDictionary<string, bool>();
 
         // Added to prevent duplicate processing
         private readonly HashSet<string> _processedMessageHashes = new HashSet<string>();
@@ -233,6 +234,20 @@ namespace DeviceDataCollector.Services
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Error sending data acknowledgment to {connectedDeviceId}");
+                        }
+                    }
+
+                    if (_pendingSetupRequests.TryRemove(connectedDeviceId, out _))
+                    {
+                        _logger.LogInformation($"Found pending setup request for device {connectedDeviceId}");
+                        try
+                        {
+                            // Send setup request command using the current stream
+                            await SendSetupRequestDirect(stream, connectedDeviceId, stoppingToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Error sending setup request to {connectedDeviceId}: {ex.Message}");
                         }
                     }
                 }
@@ -644,6 +659,24 @@ namespace DeviceDataCollector.Services
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var messageParser = scope.ServiceProvider.GetRequiredService<DeviceMessageParser>();
 
+                // Use the messageParser to determine message type
+                var messageType = messageParser.DetermineMessageType(message);
+                _logger.LogInformation($"Message type determined: {messageType}");
+
+                // Check if this is a setup response message (#R)
+                if (message.StartsWith("#R"))
+                {
+                    _logger.LogInformation($"Received potential setup response from {ipAddress}:{port}: {message}");
+
+                    // Normalize for logging
+                    string cleanedMessage = message.Replace("\u00AA", ".");
+                    _logger.LogInformation($"Normalized setup response for logging: {cleanedMessage}");
+
+                    // Process setup response
+                    await ProcessSetupResponseAsync(dbContext, message, ipAddress, port);
+                    return;
+                }
+
                 // Parse the message and store it in the database
                 var parsedMessage = messageParser.ParseMessage(message, ipAddress, port);
 
@@ -661,7 +694,18 @@ namespace DeviceDataCollector.Services
                         // Option 1: Only update the current status instead of adding to history
                         await UpdateCurrentDeviceStatusAsync(dbContext, status);
                     }
-                    // Rest of the existing code for handling other message types...
+                    else if (parsedMessage is DonationsData data)
+                    {
+                        // Store donation data
+                        dbContext.DonationsData.Add(data);
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogInformation($"Donation data from {data.DeviceId} stored in database");
+                    }
+                    else if (parsedMessage is DeviceMessageParser.SetupResponse setupResponse)
+                    {
+                        // Process setup response separately
+                        await ProcessSetupResponseAsync(dbContext, setupResponse.RawResponse, ipAddress, port);
+                    }
                 }
             }
             catch (Exception ex)
@@ -972,6 +1016,285 @@ namespace DeviceDataCollector.Services
 
             _pendingTimeSync[deviceSerialNumber] = dateTimeFormat;
             return true;
+        }
+        public static bool QueueSetupRequest(string deviceId)
+        {
+            if (string.IsNullOrEmpty(deviceId))
+                return false;
+
+            var logger = LoggerFactory.Create(builder =>
+                builder.AddConsole()).CreateLogger("DeviceSetupLogger");
+
+            logger.LogInformation($"Queuing setup request for device {deviceId} to be sent on next connection");
+            _pendingSetupRequests[deviceId] = true;
+            logger.LogInformation($"Setup request for device {deviceId} successfully queued. Current queue count: {_pendingSetupRequests.Count}");
+            return true;
+        }
+        private async Task SendSetupRequestDirect(NetworkStream stream, string deviceId, CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Preparing setup request command for device {deviceId} on active connection");
+
+                // Delay for 500ms before sending the command (shorter delay for time sync)
+                await Task.Delay(500, stoppingToken);
+
+                // Format: #rªdeviceIdª<LF>
+                using (var ms = new MemoryStream())
+                {
+                    // "#r" prefix
+                    ms.WriteByte(0x23); // #
+                    ms.WriteByte(0x72); // r
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Device ID bytes
+                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(deviceId);
+                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Line feed (0x0A)
+                    ms.WriteByte(0x0A);
+
+                    byte[] commandBytes = ms.ToArray();
+                    string hexCommand = BitConverter.ToString(commandBytes);
+
+                    _logger.LogInformation($"Setup request command assembled: {hexCommand}");
+
+                    // Send the command on the existing connection
+                    await stream.WriteAsync(commandBytes, 0, commandBytes.Length, stoppingToken);
+                    _logger.LogInformation($"Setup request command sent successfully to device {deviceId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error sending setup request command");
+                throw;
+            }
+        }
+
+        private async Task ProcessSetupResponseAsync(ApplicationDbContext dbContext, string message, string ipAddress, int port)
+        {
+            try
+            {
+                _logger.LogInformation($"Setup response received from :{port}");
+                _logger.LogInformation($"Raw message length: {message.Length} characters");
+
+                // Normalize separators (?, |, *, ª)
+                message = message.Replace("?", "\u00AA").Replace("|", "\u00AA").Replace("*", "\u00AA");
+
+                // Remove ENDE, checksum and LF at the end if present
+                int endeIndex = message.IndexOf("ENDE");
+                if (endeIndex >= 0)
+                {
+                    message = message.Substring(0, endeIndex + 4); // Keep "ENDE"
+                }
+
+                // Split the message by separators
+                var parts = message.Split('\u00AA', StringSplitOptions.None);
+
+                if (parts.Length < 13) // Minimum we need for basic setup info
+                {
+                    _logger.LogWarning($"Invalid setup response format: {message}");
+                    return;
+                }
+
+                string deviceId = parts[1];
+
+                var setup = new DeviceSetup
+                {
+                    DeviceId = deviceId,
+                    Timestamp = DateTime.Now,
+                    RawResponse = message,
+                    SoftwareVersion = parts.Length > 2 ? parts[2] : null,
+                    HardwareVersion = parts.Length > 3 ? parts[3] : null,
+                    ServerAddress = parts.Length > 4 ? parts[4] : null,
+                    DeviceIpAddress = parts.Length > 5 ? parts[5] : null,
+                    SubnetMask = parts.Length > 6 ? parts[6] : null,
+                    RemotePort = parts.Length > 7 && int.TryParse(parts[7], out int remotePort) ? remotePort : 0,
+                    LocalPort = parts.Length > 8 && int.TryParse(parts[8], out int localPort) ? localPort : 0,
+                    LipemicIndex1 = parts.Length > 9 && int.TryParse(parts[9], out int li1) ? li1 : 0,
+                    LipemicIndex2 = parts.Length > 10 && int.TryParse(parts[10], out int li2) ? li2 : 0,
+                    LipemicIndex3 = parts.Length > 11 && int.TryParse(parts[11], out int li3) ? li3 : 0
+                };
+
+                // Find the part that starts with P (profiles) and B (barcodes)
+                int pIndex = Array.IndexOf(parts, "P");
+                int bIndex = Array.IndexOf(parts, "B");
+
+                if (pIndex >= 0 && bIndex > pIndex)
+                {
+                    // Process profiles
+                    try
+                    {
+                        var profiles = new List<DeviceProfile>();
+                        int profileCount = 20;
+
+                        for (int i = 0; i < profileCount; i++)
+                        {
+                            int startIndex = pIndex + 1 + (i * 3);
+                            if (startIndex + 2 < parts.Length)
+                            {
+                                var profile = new DeviceProfile
+                                {
+                                    Index = i,
+                                    Name = parts[startIndex] ?? string.Empty,
+                                    RefCode = parts[startIndex + 1],
+                                    OffsetValue = int.TryParse(parts[startIndex + 2], out int offset) ? offset : 0
+                                };
+
+                                // Only add if it has a name (not empty)
+                                if (!string.IsNullOrEmpty(profile.Name))
+                                {
+                                    profiles.Add(profile);
+                                }
+                            }
+                        }
+
+                        // Store as JSON
+                        setup.ProfilesJson = System.Text.Json.JsonSerializer.Serialize(profiles);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing profile data");
+                    }
+
+                    // Settings come after the profiles
+                    try
+                    {
+                        int settingsIndex = pIndex + 1 + (20 * 3); // 20 profiles, 3 fields each
+                        if (settingsIndex + 7 < parts.Length)
+                        {
+                            setup.TransferMode = parts[settingsIndex] == "1";
+                            setup.BarcodesMode = parts[settingsIndex + 1] == "1";
+                            setup.OperatorIdEnabled = parts[settingsIndex + 2] == "1";
+                            setup.LotNumberEnabled = parts[settingsIndex + 3] == "1";
+                            setup.NetworkName = parts[settingsIndex + 4];
+                            setup.WifiMode = parts[settingsIndex + 5];
+                            setup.SecurityType = parts[settingsIndex + 6];
+                            setup.WifiPassword = parts[settingsIndex + 7];
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing device settings");
+                    }
+
+                    // Process barcode configs
+                    try
+                    {
+                        if (bIndex > 0 && bIndex + 1 < parts.Length)
+                        {
+                            var barcodeConfigs = new List<BarcodeConfig>();
+                            int barcodeCount = Math.Min(6, parts.Length - bIndex - 1);
+
+                            for (int i = 0; i < barcodeCount; i++)
+                            {
+                                if (bIndex + 1 + i < parts.Length)
+                                {
+                                    // Each barcode config is in a space-separated string with 4 values
+                                    string configStr = parts[bIndex + 1 + i];
+                                    var configParts = configStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                                    if (configParts.Length >= 4)
+                                    {
+                                        var config = new BarcodeConfig
+                                        {
+                                            Index = i,
+                                            MinLength = int.TryParse(configParts[0], out int min) ? min : 0,
+                                            MaxLength = int.TryParse(configParts[1], out int max) ? max : 0,
+                                            StartCode = configParts[2] ?? string.Empty,
+                                            StopCode = configParts[3] ?? string.Empty
+                                        };
+
+                                        barcodeConfigs.Add(config);
+                                    }
+                                }
+                            }
+
+                            // Store as JSON
+                            setup.BarcodesJson = System.Text.Json.JsonSerializer.Serialize(barcodeConfigs);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing barcode configurations");
+                    }
+                }
+
+                // Check if the table exists before trying to use it
+                bool tableExists = true;
+                try
+                {
+                    // This will throw an exception if the table doesn't exist
+                    await dbContext.Database.ExecuteSqlRawAsync("SELECT 1 FROM DeviceSetups LIMIT 1");
+                }
+                catch (Exception)
+                {
+                    tableExists = false;
+                    _logger.LogWarning("DeviceSetups table doesn't exist yet. Apply migrations to fix this issue.");
+                }
+
+                if (tableExists)
+                {
+                    try
+                    {
+                        // Try to get existing setup
+                        var existingSetup = await dbContext.DeviceSetups
+                            .Where(s => s.DeviceId == deviceId)
+                            .OrderByDescending(s => s.Timestamp)
+                            .FirstOrDefaultAsync();
+
+                        if (existingSetup != null)
+                        {
+                            _logger.LogInformation($"Updating existing setup for device {deviceId}");
+
+                            // Copy all properties
+                            existingSetup.Timestamp = setup.Timestamp;
+                            existingSetup.RawResponse = setup.RawResponse;
+                            existingSetup.SoftwareVersion = setup.SoftwareVersion;
+                            existingSetup.HardwareVersion = setup.HardwareVersion;
+                            existingSetup.ServerAddress = setup.ServerAddress;
+                            existingSetup.DeviceIpAddress = setup.DeviceIpAddress;
+                            existingSetup.SubnetMask = setup.SubnetMask;
+                            existingSetup.RemotePort = setup.RemotePort;
+                            existingSetup.LocalPort = setup.LocalPort;
+                            existingSetup.LipemicIndex1 = setup.LipemicIndex1;
+                            existingSetup.LipemicIndex2 = setup.LipemicIndex2;
+                            existingSetup.LipemicIndex3 = setup.LipemicIndex3;
+                            existingSetup.TransferMode = setup.TransferMode;
+                            existingSetup.BarcodesMode = setup.BarcodesMode;
+                            existingSetup.OperatorIdEnabled = setup.OperatorIdEnabled;
+                            existingSetup.LotNumberEnabled = setup.LotNumberEnabled;
+                            existingSetup.NetworkName = setup.NetworkName;
+                            existingSetup.WifiMode = setup.WifiMode;
+                            existingSetup.SecurityType = setup.SecurityType;
+                            existingSetup.WifiPassword = setup.WifiPassword;
+                            existingSetup.ProfilesJson = setup.ProfilesJson;
+                            existingSetup.BarcodesJson = setup.BarcodesJson;
+                        }
+                        else
+                        {
+                            _logger.LogInformation($"Creating new setup for device {deviceId}");
+                            dbContext.DeviceSetups.Add(setup);
+                        }
+
+                        await dbContext.SaveChangesAsync();
+                        _logger.LogInformation($"Successfully saved setup for device {deviceId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error saving device setup to database");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing setup response");
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ namespace DeviceDataCollector.Data
         public DbSet<Device> Devices { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<SystemNotification> SystemNotifications { get; set; }
+        public DbSet<DeviceSetup> DeviceSetups { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
