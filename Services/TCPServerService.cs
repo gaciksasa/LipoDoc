@@ -23,6 +23,7 @@ namespace DeviceDataCollector.Services
         private readonly ConcurrentDictionary<string, TcpClient> _activeClients = new ConcurrentDictionary<string, TcpClient>();
         private static readonly ConcurrentDictionary<string, string> _pendingTimeSync = new ConcurrentDictionary<string, string>();
         private static readonly ConcurrentDictionary<string, bool> _pendingSetupRequests = new ConcurrentDictionary<string, bool>();
+        private static readonly ConcurrentDictionary<string, DeviceSetup> _pendingSetupUpdates = new ConcurrentDictionary<string, DeviceSetup>();
 
         // Added to prevent duplicate processing
         private readonly HashSet<string> _processedMessageHashes = new HashSet<string>();
@@ -216,6 +217,34 @@ namespace DeviceDataCollector.Services
                                 _logger.LogError(ex, $"Error sending time sync command to {connectedDeviceId}: {ex.Message}");
                             }
                         }
+
+                        if (_pendingSetupUpdates.TryRemove(connectedDeviceId, out DeviceSetup setupToUpdate))
+                        {
+                            _logger.LogInformation($"Found pending setup update for device {connectedDeviceId}");
+                            try
+                            {
+                                // Send setup update command using the current stream
+                                await SendSetupUpdateCommandDirect(stream, setupToUpdate, stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error sending setup update command to {connectedDeviceId}: {ex.Message}");
+                            }
+                        }
+
+                        if (_pendingSetupRequests.TryRemove(connectedDeviceId, out _))
+                        {
+                            _logger.LogInformation($"Found pending setup request for device {connectedDeviceId}");
+                            try
+                            {
+                                // Send setup request command using the current stream
+                                await SendSetupRequestDirect(stream, connectedDeviceId, stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, $"Error sending setup request to {connectedDeviceId}: {ex.Message}");
+                            }
+                        }
                     }
                     else if (messageType == "SerialUpdateResponse")
                     {
@@ -236,19 +265,34 @@ namespace DeviceDataCollector.Services
                             _logger.LogError(ex, $"Error sending data acknowledgment to {connectedDeviceId}");
                         }
                     }
-
-                    if (_pendingSetupRequests.TryRemove(connectedDeviceId, out _))
+                    else if (data.StartsWith("#w") || data.StartsWith("#f"))
                     {
-                        _logger.LogInformation($"Found pending setup request for device {connectedDeviceId}");
-                        try
+                        // This is a response to our setup update command
+                        _logger.LogInformation($"Received setup update response: {data}");
+
+                        // Parse the response to extract the device ID
+                        string deviceId = ExtractDeviceId(data);
+
+                        // Store the response in the database for reference
+                        using var scope = _scopeFactory.CreateScope();
+                        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                        // Add a notification about the setup response
+                        var notification = new SystemNotification
                         {
-                            // Send setup request command using the current stream
-                            await SendSetupRequestDirect(stream, connectedDeviceId, stoppingToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, $"Error sending setup request to {connectedDeviceId}: {ex.Message}");
-                        }
+                            Type = "SetupResponse",
+                            Message = data.StartsWith("#w")
+                                ? $"Device {deviceId} acknowledged setup update, waiting for confirmation"
+                                : $"Device {deviceId} confirmed setup update is complete",
+                            Timestamp = DateTime.Now,
+                            Read = false,
+                            RelatedEntityId = deviceId
+                        };
+
+                        dbContext.SystemNotifications.Add(notification);
+                        await dbContext.SaveChangesAsync();
+
+                        _logger.LogInformation($"Stored setup response notification for device {deviceId}");
                     }
                 }
             }
@@ -1294,6 +1338,296 @@ namespace DeviceDataCollector.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing setup response");
+            }
+        }
+
+        public static async Task<bool> QueueSetupUpdateAsync(DeviceSetup setup)
+        {
+            if (setup == null || string.IsNullOrEmpty(setup.DeviceId))
+                return false;
+
+            // Ensure RawResponse is not null before queuing
+            if (setup.RawResponse == null)
+            {
+                setup.RawResponse = $"Setup update queued at {DateTime.Now}";
+            }
+
+            _pendingSetupUpdates[setup.DeviceId] = setup;
+            return true;
+        }
+
+        private async Task SendSetupUpdateCommandDirect(NetworkStream stream, DeviceSetup setup, CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Preparing setup update command for device {setup.DeviceId}");
+
+                // Delay for 500ms before sending the command
+                await Task.Delay(500, stoppingToken);
+
+                // Build the setup update message
+                // Format: #WªSNªSWªHWªserverAddressªdeviceIPAdressªsubnetMaskªremotePortªlocalPortªLipIndex_1ªLipIndex_2ªLipIndex_3ª...
+                using (var ms = new MemoryStream())
+                {
+                    // "#W" prefix
+                    ms.WriteByte(0x23); // #
+                    ms.WriteByte(0x57); // W
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Device ID
+                    byte[] deviceIdBytes = Encoding.ASCII.GetBytes(setup.DeviceId);
+                    ms.Write(deviceIdBytes, 0, deviceIdBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Software Version
+                    byte[] swBytes = Encoding.ASCII.GetBytes(setup.SoftwareVersion ?? "");
+                    ms.Write(swBytes, 0, swBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Hardware Version
+                    byte[] hwBytes = Encoding.ASCII.GetBytes(setup.HardwareVersion ?? "");
+                    ms.Write(hwBytes, 0, hwBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Server Address
+                    byte[] serverBytes = Encoding.ASCII.GetBytes(setup.ServerAddress ?? "");
+                    ms.Write(serverBytes, 0, serverBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Device IP Address
+                    byte[] ipBytes = Encoding.ASCII.GetBytes(setup.DeviceIpAddress ?? "");
+                    ms.Write(ipBytes, 0, ipBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Subnet Mask
+                    byte[] maskBytes = Encoding.ASCII.GetBytes(setup.SubnetMask ?? "");
+                    ms.Write(maskBytes, 0, maskBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Remote Port
+                    byte[] remotePortBytes = Encoding.ASCII.GetBytes(setup.RemotePort.ToString());
+                    ms.Write(remotePortBytes, 0, remotePortBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Local Port
+                    byte[] localPortBytes = Encoding.ASCII.GetBytes(setup.LocalPort.ToString());
+                    ms.Write(localPortBytes, 0, localPortBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Lipemic Index 1
+                    byte[] li1Bytes = Encoding.ASCII.GetBytes(setup.LipemicIndex1.ToString());
+                    ms.Write(li1Bytes, 0, li1Bytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Lipemic Index 2
+                    byte[] li2Bytes = Encoding.ASCII.GetBytes(setup.LipemicIndex2.ToString());
+                    ms.Write(li2Bytes, 0, li2Bytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Lipemic Index 3
+                    byte[] li3Bytes = Encoding.ASCII.GetBytes(setup.LipemicIndex3.ToString());
+                    ms.Write(li3Bytes, 0, li3Bytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // P marker for profiles
+                    ms.WriteByte(0x50); // P
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Add profiles (20 of them)
+                    List<DeviceProfile> profiles = setup.Profiles ?? new List<DeviceProfile>();
+                    // Make sure we have 20 profiles
+                    while (profiles.Count < 20)
+                    {
+                        profiles.Add(new DeviceProfile
+                        {
+                            Index = profiles.Count,
+                            Name = "",
+                            RefCode = "",
+                            OffsetValue = 0
+                        });
+                    }
+
+                    // Sort profiles by index
+                    profiles = profiles.OrderBy(p => p.Index).ToList();
+
+                    // Write all 20 profiles
+                    for (int i = 0; i < 20; i++)
+                    {
+                        var profile = profiles.FirstOrDefault(p => p.Index == i) ??
+                            new DeviceProfile { Index = i, Name = "", RefCode = "", OffsetValue = 0 };
+
+                        // Name
+                        byte[] nameBytes = Encoding.ASCII.GetBytes(profile.Name ?? "");
+                        ms.Write(nameBytes, 0, nameBytes.Length);
+
+                        // Separator (0xAA)
+                        ms.WriteByte(0xAA);
+
+                        // REF code
+                        byte[] refBytes = Encoding.ASCII.GetBytes(profile.RefCode ?? "");
+                        ms.Write(refBytes, 0, refBytes.Length);
+
+                        // Separator (0xAA)
+                        ms.WriteByte(0xAA);
+
+                        // Offset value
+                        byte[] offsetBytes = Encoding.ASCII.GetBytes(profile.OffsetValue.ToString());
+                        ms.Write(offsetBytes, 0, offsetBytes.Length);
+
+                        // Separator (0xAA) after each profile
+                        ms.WriteByte(0xAA);
+                    }
+
+                    // Device settings
+                    // Transfer Mode
+                    byte[] transferModeBytes = Encoding.ASCII.GetBytes(setup.TransferMode ? "1" : "0");
+                    ms.Write(transferModeBytes, 0, transferModeBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Barcodes Mode
+                    byte[] barcodesModeBytes = Encoding.ASCII.GetBytes(setup.BarcodesMode ? "1" : "0");
+                    ms.Write(barcodesModeBytes, 0, barcodesModeBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Operator ID
+                    byte[] operatorIdBytes = Encoding.ASCII.GetBytes(setup.OperatorIdEnabled ? "1" : "0");
+                    ms.Write(operatorIdBytes, 0, operatorIdBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // LOT Number
+                    byte[] lotNumberBytes = Encoding.ASCII.GetBytes(setup.LotNumberEnabled ? "1" : "0");
+                    ms.Write(lotNumberBytes, 0, lotNumberBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Network Name
+                    byte[] networkNameBytes = Encoding.ASCII.GetBytes(setup.NetworkName ?? "");
+                    ms.Write(networkNameBytes, 0, networkNameBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // WiFi Mode
+                    byte[] wifiModeBytes = Encoding.ASCII.GetBytes(setup.WifiMode ?? "");
+                    ms.Write(wifiModeBytes, 0, wifiModeBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Security Type
+                    byte[] securityTypeBytes = Encoding.ASCII.GetBytes(setup.SecurityType ?? "");
+                    ms.Write(securityTypeBytes, 0, securityTypeBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // WiFi Password
+                    byte[] wifiPassBytes = Encoding.ASCII.GetBytes(setup.WifiPassword ?? "");
+                    ms.Write(wifiPassBytes, 0, wifiPassBytes.Length);
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // B marker for barcode configurations
+                    ms.WriteByte(0x42); // B
+
+                    // Separator (0xAA)
+                    ms.WriteByte(0xAA);
+
+                    // Add barcode configurations (6 of them)
+                    List<BarcodeConfig> barcodeConfigs = setup.BarcodeConfigs ?? new List<BarcodeConfig>();
+
+                    // Make sure we have 6 barcode configs
+                    while (barcodeConfigs.Count < 6)
+                    {
+                        barcodeConfigs.Add(new BarcodeConfig
+                        {
+                            Index = barcodeConfigs.Count,
+                            MinLength = 0,
+                            MaxLength = 0,
+                            StartCode = "",
+                            StopCode = ""
+                        });
+                    }
+
+                    // Sort barcode configs by index
+                    barcodeConfigs = barcodeConfigs.OrderBy(b => b.Index).ToList();
+
+                    // Write all 6 barcode configurations
+                    for (int i = 0; i < 6; i++)
+                    {
+                        var config = barcodeConfigs.FirstOrDefault(b => b.Index == i) ??
+                            new BarcodeConfig { Index = i, MinLength = 0, MaxLength = 0, StartCode = "", StopCode = "" };
+
+                        // Format: minLength maxLength StartCode StopCode
+                        string configText = $"{config.MinLength} {config.MaxLength} {config.StartCode} {config.StopCode}";
+                        byte[] configBytes = Encoding.ASCII.GetBytes(configText);
+                        ms.Write(configBytes, 0, configBytes.Length);
+
+                        // Separator (0xAA) after each barcode config (except the last one)
+                        if (i < 5)
+                        {
+                            ms.WriteByte(0xAA);
+                        }
+                    }
+
+                    // Calculate checksum
+                    byte[] messageBytes = ms.ToArray();
+                    byte checksum = CalculateChecksum(messageBytes);
+
+                    // Add checksum
+                    ms.WriteByte(checksum);
+
+                    // End of message marker (0xFD)
+                    ms.WriteByte(0xFD);
+
+                    // Line feed (0x0A)
+                    ms.WriteByte(0x0A);
+
+                    byte[] completeMessage = ms.ToArray();
+
+                    // Send the setup update command
+                    await stream.WriteAsync(completeMessage, 0, completeMessage.Length, stoppingToken);
+                    _logger.LogInformation($"Sent setup update command to device {setup.DeviceId}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error sending setup update command to device {setup.DeviceId}");
+                throw;
             }
         }
     }

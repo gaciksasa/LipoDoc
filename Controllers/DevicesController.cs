@@ -1,5 +1,6 @@
 ﻿using DeviceDataCollector.Data;
 using DeviceDataCollector.Models;
+using DeviceDataCollector.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -563,6 +564,166 @@ namespace DeviceDataCollector.Controllers
 
             ViewBag.Device = device;
             return View(setup);
+        }
+
+        // GET: Devices/EditSetup/5
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> EditSetup(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var device = await _context.Devices.FindAsync(id);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            // Check if the device is in setup mode
+            var currentStatus = await _context.CurrentDeviceStatuses
+                .FirstOrDefaultAsync(s => s.DeviceId == device.SerialNumber);
+
+            if (currentStatus == null || currentStatus.Status != 3)
+            {
+                TempData["ErrorMessage"] = "Device is not in setup mode. Setup can only be modified when device status is 3.";
+                return RedirectToAction(nameof(Setup), new { id = id });
+            }
+
+            // Get the latest setup info
+            var setup = await _context.DeviceSetups
+                .Where(s => s.DeviceId == device.SerialNumber)
+                .OrderByDescending(s => s.Timestamp)
+                .FirstOrDefaultAsync();
+
+            if (setup == null)
+            {
+                TempData["ErrorMessage"] = "No setup information available for this device. Please request setup information first.";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+
+            // Deserialize JSON data for editing
+            try
+            {
+                if (!string.IsNullOrEmpty(setup.ProfilesJson))
+                {
+                    setup.Profiles = System.Text.Json.JsonSerializer.Deserialize<List<DeviceProfile>>(setup.ProfilesJson)
+                                     ?? new List<DeviceProfile>();
+                }
+                else
+                {
+                    setup.Profiles = new List<DeviceProfile>();
+                }
+
+                if (!string.IsNullOrEmpty(setup.BarcodesJson))
+                {
+                    setup.BarcodeConfigs = System.Text.Json.JsonSerializer.Deserialize<List<BarcodeConfig>>(setup.BarcodesJson)
+                                           ?? new List<BarcodeConfig>();
+                }
+                else
+                {
+                    setup.BarcodeConfigs = new List<BarcodeConfig>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deserializing JSON data for device setup");
+            }
+
+            ViewBag.Device = device;
+            return View(setup);
+        }
+
+        // POST: Devices/SaveSetup
+        // In DevicesController.cs, modify the SaveSetup method:
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = "RequireAdminRole")]
+        public async Task<IActionResult> SaveSetup(DeviceSetup model, int deviceModelId, List<DeviceProfile> Profiles, List<BarcodeConfig> BarcodeConfigs)
+        {
+            var device = await _context.Devices.FindAsync(deviceModelId);
+            if (device == null)
+            {
+                return NotFound();
+            }
+
+            // Make sure we have the right device ID
+            model.DeviceId = device.SerialNumber;
+
+            try
+            {
+                // Check if the device is in setup mode
+                var currentStatus = await _context.CurrentDeviceStatuses
+                    .FirstOrDefaultAsync(s => s.DeviceId == device.SerialNumber);
+
+                if (currentStatus == null || currentStatus.Status != 3)
+                {
+                    TempData["ErrorMessage"] = "Device is not in setup mode. Setup can only be modified when device status is 3.";
+                    return RedirectToAction(nameof(Setup), new { id = deviceModelId });
+                }
+
+                // Set current time
+                model.Timestamp = DateTime.Now;
+
+                // Process profiles and barcode configurations
+                model.Profiles = Profiles ?? new List<DeviceProfile>();
+                model.BarcodeConfigs = BarcodeConfigs ?? new List<BarcodeConfig>();
+
+                // Serialize JSON data
+                model.ProfilesJson = System.Text.Json.JsonSerializer.Serialize(model.Profiles);
+                model.BarcodesJson = System.Text.Json.JsonSerializer.Serialize(model.BarcodeConfigs);
+
+                // IMPORTANT: Ensure RawResponse is not null - this is what's causing the error
+                if (model.RawResponse == null)
+                {
+                    // Create a placeholder RawResponse if it's null
+                    model.RawResponse = $"Manually edited setup for device {model.DeviceId} at {DateTime.Now}";
+                }
+
+                // Save the updated setup to the database first
+                var existingSetup = await _context.DeviceSetups.FindAsync(model.Id);
+                if (existingSetup != null)
+                {
+                    // Update existing setup
+                    _context.Entry(existingSetup).CurrentValues.SetValues(model);
+                    existingSetup.ProfilesJson = model.ProfilesJson;
+                    existingSetup.BarcodesJson = model.BarcodesJson;
+                    existingSetup.RawResponse = model.RawResponse; // Make sure this is set
+
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Updated setup for device {model.DeviceId} in database");
+                }
+                else
+                {
+                    // Create new setup entry
+                    _context.DeviceSetups.Add(model);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Created new setup for device {model.DeviceId} in database");
+                }
+
+                // Now send the setup to the device
+                var deviceCommunicationService = HttpContext.RequestServices.GetRequiredService<DeviceCommunicationService>();
+                var (success, response) = await deviceCommunicationService.UpdateDeviceSetupAsync(model);
+
+                if (success)
+                {
+                    TempData["SuccessMessage"] = "Setup update has been queued and will be sent to the device. Please wait for device response.";
+                    return RedirectToAction(nameof(Setup), new { id = deviceModelId });
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = $"Failed to send setup to device: {response}";
+                    return RedirectToAction(nameof(EditSetup), new { id = deviceModelId });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error saving or sending setup to device {model.DeviceId}");
+                TempData["ErrorMessage"] = $"Error: {ex.Message}";
+                return RedirectToAction(nameof(EditSetup), new { id = deviceModelId });
+            }
         }
 
     }

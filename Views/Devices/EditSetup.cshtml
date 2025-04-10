@@ -1,0 +1,372 @@
+﻿@model DeviceDataCollector.Models.DeviceSetup
+
+@{
+    var device = ViewBag.Device as DeviceDataCollector.Models.Device;
+    ViewData["Title"] = $"Edit Device Setup - {device.Name}";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Index">Devices</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@device.Id">@device.SerialNumber</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Setup" asp-route-id="@device.Id">Setup</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Edit</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    @if (ViewBag.ResponseMessage != null)
+    {
+        <div class="alert alert-info">
+            <h6>Device Response:</h6>
+            <pre class="mb-0"><code>@ViewBag.ResponseMessage</code></pre>
+        </div>
+    }
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Edit Device Setup</h1>
+            <a asp-action="Setup" asp-route-id="@device.Id" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Setup
+            </a>
+        </div>
+    </div>
+
+    <form asp-action="SaveSetup" method="post">
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="DeviceId" />
+        <input type="hidden" name="deviceModelId" value="@device.Id" />
+
+        <div class="row">
+            <div class="col-md-6">
+                <!-- Basic Device Information -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Serial Number:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                @Model.DeviceId
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Software Version:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="SoftwareVersion" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Hardware Version:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="HardwareVersion" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Lipemic Thresholds:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="mb-2">
+                                    <label class="form-label">Group I-II Threshold:</label>
+                                    <input asp-for="LipemicIndex1" class="form-control" type="number" />
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Group II-III Threshold:</label>
+                                    <input asp-for="LipemicIndex2" class="form-control" type="number" />
+                                </div>
+                                <div>
+                                    <label class="form-label">Group III-IV Threshold:</label>
+                                    <input asp-for="LipemicIndex3" class="form-control" type="number" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Network Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Device IP:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="DeviceIpAddress" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Subnet Mask:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="SubnetMask" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Server Address:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="ServerAddress" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Remote Port:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="RemotePort" class="form-control" type="number" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Local Port:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="LocalPort" class="form-control" type="number" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>WiFi SSID:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="NetworkName" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>WiFi Mode:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="WifiMode" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>Security Type:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="SecurityType" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4 text-muted">
+                                <strong>WiFi Password:</strong>
+                            </div>
+                            <div class="col-md-8">
+                                <input asp-for="WifiPassword" class="form-control" type="password" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Device Settings -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Device Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input asp-for="TransferMode" class="form-check-input" type="checkbox" />
+                                <label asp-for="TransferMode" class="form-check-label">Transfer Mode</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input asp-for="BarcodesMode" class="form-check-input" type="checkbox" />
+                                <label asp-for="BarcodesMode" class="form-check-label">Barcodes Mode</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input asp-for="OperatorIdEnabled" class="form-check-input" type="checkbox" />
+                                <label asp-for="OperatorIdEnabled" class="form-check-label">Operator ID</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input asp-for="LotNumberEnabled" class="form-check-input" type="checkbox" />
+                                <label asp-for="LotNumberEnabled" class="form-check-label">LOT Number</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <!-- Barcode Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Barcode Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Min Length</th>
+                                        <th>Max Length</th>
+                                        <th>Start Code</th>
+                                        <th>Stop Code</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        string[] types = new string[] {
+                                    "REF Code",
+                                    "Donation ID",
+                                    "Operator ID",
+                                    "LOT Number",
+                                    "Type 5",
+                                    "Type 6"
+                                                                };
+
+                                        for (int i = 0; i < 6; i++)
+                                        {
+                                            var idx = i;
+                                            var config = Model.BarcodeConfigs?.FirstOrDefault(bc => bc.Index == idx);
+                                            if (config == null)
+                                            {
+                                                config = new DeviceDataCollector.Models.BarcodeConfig
+                    {
+                        Index = idx,
+                        MinLength = 0,
+                        MaxLength = 0,
+                        StartCode = "",
+                        StopCode = ""
+                    };
+                                            }
+
+                                            <tr>
+                                                <td>@types[i]</td>
+                                                <td>
+                                                    <input type="hidden" name="BarcodeConfigs[@i].Index" value="@i" />
+                                                    <input type="number" class="form-control form-control-sm" name="BarcodeConfigs[@i].MinLength" value="@config.MinLength" />
+                                                </td>
+                                                <td>
+                                                    <input type="number" class="form-control form-control-sm" name="BarcodeConfigs[@i].MaxLength" value="@config.MaxLength" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" name="BarcodeConfigs[@i].StartCode" value="@config.StartCode" />
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control form-control-sm" name="BarcodeConfigs[@i].StopCode" value="@config.StopCode" />
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profiles Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Tube Profiles</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Profile Name</th>
+                                        <th>REF Code</th>
+                                        <th>Offset Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < 20; i++)
+                                    {
+                                        var idx = i;
+                                        var profile = Model.Profiles?.FirstOrDefault(p => p.Index == idx);
+                                        if (profile == null)
+                                        {
+                                            profile = new DeviceDataCollector.Models.DeviceProfile
+                    {
+                        Index = idx,
+                        Name = "",
+                        RefCode = "",
+                        OffsetValue = 0
+                    };
+                                        }
+
+                                        <tr>
+                                            <td>@(i + 1)</td>
+                                            <td>
+                                                <input type="hidden" name="Profiles[@i].Index" value="@i" />
+                                                <input type="text" class="form-control form-control-sm" name="Profiles[@i].Name" value="@profile.Name" />
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm" name="Profiles[@i].RefCode" value="@profile.RefCode" />
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-control form-control-sm" name="Profiles[@i].OffsetValue" value="@profile.OffsetValue" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mb-4">
+            <a asp-action="Setup" asp-route-id="@device.Id" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-send"></i> Save and Send to Device
+            </button>
+        </div>
+    </form>
+</div>

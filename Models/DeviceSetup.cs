@@ -39,7 +39,7 @@ namespace DeviceDataCollector.Models
         public string? WifiPassword { get; set; }
 
         // Raw response for debugging
-        public string? RawResponse { get; set; }
+        public string? RawResponse { get; set; } = "Manually configured setup";
 
         // Profile data stored as JSON
         public string? ProfilesJson { get; set; }

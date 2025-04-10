@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Text;
 using DeviceDataCollector.Data;
+using DeviceDataCollector.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace DeviceDataCollector.Services
@@ -153,6 +154,35 @@ namespace DeviceDataCollector.Services
             {
                 _logger.LogError(ex, $"Error queuing setup request for device {serialNumber}");
                 return false;
+            }
+        }
+
+        public async Task<(bool Success, string Response)> UpdateDeviceSetupAsync(DeviceSetup setup)
+        {
+            if (setup == null || string.IsNullOrEmpty(setup.DeviceId))
+            {
+                _logger.LogWarning("Cannot update setup for null or empty device");
+                return (false, "Invalid setup data");
+            }
+
+            _logger.LogInformation($"Preparing to update setup for device: {setup.DeviceId}");
+
+            try
+            {
+                // Queue the setup update in the TCPServerService
+                bool success = await TCPServerService.QueueSetupUpdateAsync(setup);
+
+                if (!success)
+                {
+                    return (false, "Failed to queue setup update command");
+                }
+
+                return (true, "Setup update queued. The change will be applied when the device next communicates with the server.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error queueing setup update for device {setup.DeviceId}");
+                return (false, $"Error: {ex.Message}");
             }
         }
     }
