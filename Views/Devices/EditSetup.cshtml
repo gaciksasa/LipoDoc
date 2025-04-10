@@ -196,7 +196,23 @@
                                 <strong>WiFi Password:</strong>
                             </div>
                             <div class="col-md-8">
-                                <input asp-for="WifiPassword" class="form-control" type="password" />
+                                <div class="input-group">
+                                    <input asp-for="WifiPassword" class="form-control" type="password"
+                                           value="@Model.WifiPassword" />
+                                    <button class="btn btn-outline-secondary" type="button" id="togglePasswordVisibility">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">
+                                    @if (!string.IsNullOrEmpty(Model.WifiPassword))
+                                    {
+                                        <span class="text-muted">Password is set. Leave as is or enter a new password to change it.</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">No password is currently set</span>
+                                    }
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -370,3 +386,24 @@
         </div>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        // Toggle password visibility
+        $(document).ready(function() {
+            $("#togglePasswordVisibility").on("click", function() {
+                var passwordField = $("#WifiPassword");
+                var passwordType = passwordField.attr("type");
+
+                // Toggle between password and text
+                if (passwordType === "password") {
+                    passwordField.attr("type", "text");
+                    $(this).find("i").removeClass("bi-eye").addClass("bi-eye-slash");
+                } else {
+                    passwordField.attr("type", "password");
+                    $(this).find("i").removeClass("bi-eye-slash").addClass("bi-eye");
+                }
+            });
+        });
+    </script>
+}

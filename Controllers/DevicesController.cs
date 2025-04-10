@@ -660,7 +660,7 @@ namespace DeviceDataCollector.Controllers
 
                 if (currentStatus == null || currentStatus.Status != 3)
                 {
-                    TempData["ErrorMessage"] = "Device is not in setup mode. Setup can only be modified when device status is 3.";
+                    TempData["ErrorMessage"] = "Device is not in setup mode. Setup can only be modified when device is in Setup mode.";
                     return RedirectToAction(nameof(Setup), new { id = deviceModelId });
                 }
 
@@ -690,7 +690,7 @@ namespace DeviceDataCollector.Controllers
                     _context.Entry(existingSetup).CurrentValues.SetValues(model);
                     existingSetup.ProfilesJson = model.ProfilesJson;
                     existingSetup.BarcodesJson = model.BarcodesJson;
-                    existingSetup.RawResponse = model.RawResponse; // Make sure this is set
+                    existingSetup.RawResponse = model.RawResponse; 
 
                     await _context.SaveChangesAsync();
                     _logger.LogInformation($"Updated setup for device {model.DeviceId} in database");
@@ -701,6 +701,22 @@ namespace DeviceDataCollector.Controllers
                     _context.DeviceSetups.Add(model);
                     await _context.SaveChangesAsync();
                     _logger.LogInformation($"Created new setup for device {model.DeviceId} in database");
+                }
+
+                if (string.IsNullOrEmpty(model.WifiPassword))
+                {
+                    // If we're getting a null or empty password when there should be one,
+                    // check if we have an existing setup with a password
+                    if (existingSetup != null && !string.IsNullOrEmpty(existingSetup.WifiPassword))
+                    {
+                        _logger.LogWarning($"WiFi password was empty in form submission for device {model.DeviceId}, preserving existing password");
+                        model.WifiPassword = existingSetup.WifiPassword;
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"WiFi password is empty for device {model.DeviceId}, setting default empty string");
+                        model.WifiPassword = string.Empty; // Default to empty string if no password found
+                    }
                 }
 
                 // Now send the setup to the device

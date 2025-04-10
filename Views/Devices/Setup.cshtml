@@ -51,17 +51,17 @@
             <div>
                 @if (User.IsInRole("Admin"))
                 {
-                    <a asp-action="EditSetup" asp-route-id="@device.Id" class="btn btn-warning me-2">
+                    <a asp-action="EditSetup" asp-route-id="@device.Id" class="btn btn-info me-2">
                         <i class="bi bi-pencil"></i> Edit Setup
                     </a>
                 }
                 <form asp-action="RequestSetup" method="post" class="d-inline">
                     <input type="hidden" name="id" value="@device.Id" />
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-info">
                         <i class="bi bi-arrow-repeat"></i> Refresh Setup
                     </button>
                 </form>
-                <a asp-action="Details" asp-route-id="@device.Id" class="btn btn-secondary ms-2">
+                <a asp-action="Details" asp-route-id="@device.Id" class="btn btn-warning ms-2">
                     <i class="bi bi-arrow-left"></i> Back to Details
                 </a>
             </div>
@@ -194,6 +194,15 @@
                         </div>
                         <div class="col-md-8">
                             @Model.SecurityType
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 text-muted">
+                            <strong>WiFi Password:</strong>
+                        </div>
+                        <div class="col-md-8">
+                            @Model.WifiPassword
                         </div>
                     </div>
                 </div>
