@@ -68,7 +68,8 @@ $.validator.addMethod( "abaRoutingNumber", function( value ) {
 	}
 
 	// If not zero and divisible by 10 then valid
-	if ( checksum !== 0 && checksum % 10 === 0 ) {
+	if (checksum !== 0 &&
+		10 === 0) {
 		return true;
 	}
 

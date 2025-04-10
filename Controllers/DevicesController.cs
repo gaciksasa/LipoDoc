@@ -523,6 +523,31 @@ namespace DeviceDataCollector.Controllers
                         await Task.Delay(1500);
                     }
 
+                    // Check for pending setup update from TempData
+                    if (TempData["PendingSetupUpdate"] != null && TempData["PendingSetupUpdateDeviceId"]?.ToString() == device.SerialNumber)
+                    {
+                        ViewBag.PendingSetupUpdate = true;
+                    }
+
+                    // Check for setup response notifications
+                    var setupNotifications = await _context.SystemNotifications
+                        .Where(n => n.Type == "SetupResponse" && n.RelatedEntityId == device.SerialNumber && !n.Read)
+                        .OrderByDescending(n => n.Timestamp)
+                        .ToListAsync();
+
+                    if (setupNotifications.Any())
+                    {
+                        // Mark them as read
+                        foreach (var notification in setupNotifications)
+                        {
+                            notification.Read = true;
+                        }
+                        await _context.SaveChangesAsync();
+
+                        // Store the most recent notification message
+                        ViewBag.SetupResponseMessage = setupNotifications.First().Message;
+                    }
+
                     // Try to get the setup from the database
                     setup = await _context.DeviceSetups
                         .Where(s => s.DeviceId == device.SerialNumber)
@@ -636,7 +661,6 @@ namespace DeviceDataCollector.Controllers
         }
 
         // POST: Devices/SaveSetup
-        // In DevicesController.cs, modify the SaveSetup method:
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -725,6 +749,10 @@ namespace DeviceDataCollector.Controllers
 
                 if (success)
                 {
+                    TempData["PendingSetupUpdate"] = true;
+                    TempData["PendingSetupUpdateDeviceId"] = model.DeviceId;
+                    TempData["PendingSetupTimestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
                     TempData["SuccessMessage"] = "Setup update has been queued and will be sent to the device. Please wait for device response.";
                     return RedirectToAction(nameof(Setup), new { id = deviceModelId });
                 }

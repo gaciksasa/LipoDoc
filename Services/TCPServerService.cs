@@ -265,17 +265,42 @@ namespace DeviceDataCollector.Services
                             _logger.LogError(ex, $"Error sending data acknowledgment to {connectedDeviceId}");
                         }
                     }
-                    else if (data.StartsWith("#w") || data.StartsWith("#f"))
+                    if (data.StartsWith("#w") || data.StartsWith("#f"))
                     {
                         // This is a response to our setup update command
                         _logger.LogInformation($"Received setup update response: {data}");
 
                         // Parse the response to extract the device ID
                         string deviceId = ExtractDeviceId(data);
+                        _logger.LogInformation($"Device {deviceId} sent setup response: {data}");
 
                         // Store the response in the database for reference
                         using var scope = _scopeFactory.CreateScope();
                         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                        // Get the latest setup for this device
+                        var latestSetup = await dbContext.DeviceSetups
+                            .Where(s => s.DeviceId == deviceId)
+                            .OrderByDescending(s => s.Timestamp)
+                            .FirstOrDefaultAsync(stoppingToken);
+
+                        if (latestSetup != null)
+                        {
+                            if (data.StartsWith("#f"))
+                            {
+                                // Update the RawResponse to include confirmation
+                                latestSetup.RawResponse += $"\n\nDevice confirmed setup update at {DateTime.Now}: {data}";
+                                await dbContext.SaveChangesAsync(stoppingToken);
+                                _logger.LogInformation($"Updated device setup with confirmation for {deviceId}");
+                            }
+                            else if (data.StartsWith("#w"))
+                            {
+                                // Update the RawResponse to include acknowledgment
+                                latestSetup.RawResponse += $"\n\nDevice acknowledged setup command at {DateTime.Now}: {data}";
+                                await dbContext.SaveChangesAsync(stoppingToken);
+                                _logger.LogInformation($"Updated device setup with acknowledgment for {deviceId}");
+                            }
+                        }
 
                         // Add a notification about the setup response
                         var notification = new SystemNotification
@@ -290,7 +315,7 @@ namespace DeviceDataCollector.Services
                         };
 
                         dbContext.SystemNotifications.Add(notification);
-                        await dbContext.SaveChangesAsync();
+                        await dbContext.SaveChangesAsync(stoppingToken);
 
                         _logger.LogInformation($"Stored setup response notification for device {deviceId}");
                     }
@@ -407,7 +432,7 @@ namespace DeviceDataCollector.Services
             {
                 checksum += b;
             }
-            return (byte)(checksum % 256);
+            return (byte)(checksum % 253);
         }
 
         private async Task SendSerialUpdateCommandDirect(NetworkStream stream, string currentSerialNumber, string newSerialNumber, CancellationToken stoppingToken)
@@ -1604,6 +1629,9 @@ namespace DeviceDataCollector.Services
                         }
                     }
 
+                    // Separator
+                    ms.WriteByte(0xAA);
+
                     // Calculate checksum
                     byte[] messageBytes = ms.ToArray();
                     byte checksum = CalculateChecksum(messageBytes);
@@ -1619,9 +1647,13 @@ namespace DeviceDataCollector.Services
 
                     byte[] completeMessage = ms.ToArray();
 
+                    // Log the command as hex for debugging
+                    string hexCommand = BitConverter.ToString(completeMessage);
+                    _logger.LogInformation($"Setup command assembled (first 100 bytes): {hexCommand.Substring(0, Math.Min(hexCommand.Length, 300))}...");
+
                     // Send the setup update command
                     await stream.WriteAsync(completeMessage, 0, completeMessage.Length, stoppingToken);
-                    _logger.LogInformation($"Sent setup update command to device {setup.DeviceId}");
+                    _logger.LogInformation($"Sent setup update command to device {setup.DeviceId} - {completeMessage.Length} bytes");
                 }
             }
             catch (Exception ex)

@@ -169,14 +169,27 @@ namespace DeviceDataCollector.Services
 
             try
             {
+                // Verify setup data is valid
+                if (setup.Profiles == null || setup.BarcodeConfigs == null)
+                {
+                    _logger.LogWarning($"Setup data is incomplete for device {setup.DeviceId}");
+                    return (false, "Setup data is incomplete");
+                }
+
+                // Log the key setup parameters for verification
+                _logger.LogInformation($"Setup details: ServerAddress={setup.ServerAddress}, RemotePort={setup.RemotePort}, " +
+                                      $"Profiles={setup.Profiles.Count}, BarcodeConfigs={setup.BarcodeConfigs.Count}");
+
                 // Queue the setup update in the TCPServerService
                 bool success = await TCPServerService.QueueSetupUpdateAsync(setup);
 
                 if (!success)
                 {
+                    _logger.LogWarning($"Failed to queue setup update command for device {setup.DeviceId}");
                     return (false, "Failed to queue setup update command");
                 }
 
+                _logger.LogInformation($"Setup update for device {setup.DeviceId} successfully queued");
                 return (true, "Setup update queued. The change will be applied when the device next communicates with the server.");
             }
             catch (Exception ex)

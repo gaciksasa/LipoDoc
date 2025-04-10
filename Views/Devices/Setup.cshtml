@@ -19,6 +19,39 @@
         </div>
     </div>
 
+    @if (ViewBag.PendingSetupUpdate != null && ViewBag.PendingSetupUpdate)
+    {
+        <div class="alert alert-info d-flex align-items-center" id="pendingSetupAlert">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div>
+                Setup update has been sent to the device. Waiting for confirmation... This may take a few moments.
+            </div>
+        </div>
+
+        <script>
+            // Auto-refresh the page a few times to check for confirmation
+            let refreshCount = 0;
+            const refreshInterval = setInterval(function() {
+                refreshCount++;
+                if (refreshCount >= 10) { // Try 10 times (20 seconds total)
+                    clearInterval(refreshInterval);
+                    $("#pendingSetupAlert").html('<div class="alert alert-warning">Device has not confirmed the setup update yet. It may apply the changes later when it reconnects.</div>');
+                } else {
+                    location.reload();
+                }
+            }, 2000); // Check every 2 seconds
+        </script>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.RawResponse) && Model.RawResponse.Contains("Device confirmed setup update"))
+    {
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle"></i> Device has confirmed the setup update was applied successfully.
+        </div>
+    }
+
     @if (TempData["SetupRequested"] != null)
     {
         <div class="alert alert-info d-flex align-items-center" id="setupLoadingAlert">
