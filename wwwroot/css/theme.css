@@ -249,6 +249,12 @@ body {
     border-color: var(--bs-info);
 }
 
+.btn-info.disabled, .btn-info:disabled {
+    background-color: var(--bs-info);
+    border-color: var(--bs-info);
+    opacity: 0.3;
+}
+
 /* Button hover effects */
 .btn-primary:hover {
     background-color: #8e1b52; /* Darker pink */
