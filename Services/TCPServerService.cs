@@ -425,16 +425,6 @@ namespace DeviceDataCollector.Services
             return string.Empty;
         }
 
-        private byte CalculateChecksum(byte[] data)
-        {
-            byte checksum = 0;
-            foreach (byte b in data)
-            {
-                checksum += b;
-            }
-            return (byte)(checksum % 253);
-        }
-
         private async Task SendSerialUpdateCommandDirect(NetworkStream stream, string currentSerialNumber, string newSerialNumber, CancellationToken stoppingToken)
         {
             try
@@ -1632,12 +1622,23 @@ namespace DeviceDataCollector.Services
                     // Separator
                     ms.WriteByte(0xAA);
 
+                    // Add ENDE marker
+                    byte[] endeBytes = Encoding.ASCII.GetBytes("ENDE");
+                    ms.Write(endeBytes, 0, endeBytes.Length);
+
+                    // Separator
+                    ms.WriteByte(0xAA);
+
                     // Calculate checksum
                     byte[] messageBytes = ms.ToArray();
-                    byte checksum = CalculateChecksum(messageBytes);
+                    ushort checksumValue = CalculateChecksumUInt16(messageBytes);
 
-                    // Add checksum
-                    ms.WriteByte(checksum);
+                    // Convert to a 2-digit hex string (will still be modulo 253, so max FF)
+                    string hexString = (checksumValue % 253).ToString("X2");
+
+                    // Write each hex digit as a separate ASCII byte
+                    ms.WriteByte((byte)hexString[0]); // First hex digit
+                    ms.WriteByte((byte)hexString[1]); // Second hex digit
 
                     // End of message marker (0xFD)
                     ms.WriteByte(0xFD);
@@ -1661,6 +1662,26 @@ namespace DeviceDataCollector.Services
                 _logger.LogError(ex, $"Error sending setup update command to device {setup.DeviceId}");
                 throw;
             }
+        }
+
+        private byte CalculateChecksum(byte[] data)
+        {
+            byte checksum = 0;
+            foreach (byte b in data)
+            {
+                checksum += b;
+            }
+            return (byte)(checksum % 253);
+        }
+
+        private ushort CalculateChecksumUInt16(byte[] data)
+        {
+            ushort checksum = 0;
+            foreach (byte b in data)
+            {
+                checksum += b;
+            }
+            return checksum;
         }
     }
 }
