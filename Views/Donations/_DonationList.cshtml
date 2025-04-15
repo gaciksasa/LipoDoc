@@ -5,11 +5,41 @@
     <table class="table table-striped table-hover mb-0">
         <thead class="table-light">
             <tr>
-                <th>Donation ID</th>
-                <th>Device</th>
-                <th>Date/Time</th>
-                <th>Lipemic Value</th>
-                <th>Lipemic Group</th>
+                <th>
+                    <a asp-action="Index" asp-route-sortOrder="@ViewBag.DonationIdSortParm"
+                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                       asp-route-todayOnly="@ViewBag.TodayOnly" class="text-decoration-none text-dark">
+                        Donation ID
+                    </a>
+                </th>
+                <th>
+                    <a asp-action="Index" asp-route-sortOrder="@ViewBag.DeviceSortParm"
+                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                       asp-route-todayOnly="@ViewBag.TodayOnly" class="text-decoration-none text-dark">
+                        Device
+                    </a>
+                </th>
+                <th>
+                    <a asp-action="Index" asp-route-sortOrder="@ViewBag.TimestampSortParm"
+                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                       asp-route-todayOnly="@ViewBag.TodayOnly" class="text-decoration-none text-dark">
+                        Date/Time
+                    </a>
+                </th>
+                <th>
+                    <a asp-action="Index" asp-route-sortOrder="@ViewBag.LipemicValueSortParm"
+                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                       asp-route-todayOnly="@ViewBag.TodayOnly" class="text-decoration-none text-dark">
+                        Lipemic Value
+                    </a>
+                </th>
+                <th>
+                    <a asp-action="Index" asp-route-sortOrder="@ViewBag.LipemicGroupSortParm"
+                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                       asp-route-todayOnly="@ViewBag.TodayOnly" class="text-decoration-none text-dark">
+                        Lipemic Group
+                    </a>
+                </th>
                 <th>Status</th>
                 <th>Operator</th>
                 <th>Actions</th>
@@ -90,7 +120,7 @@
 
 @if (!Model.Any())
 {
-    <div class="alert alert-info">
+    <div class="alert alert-info m-3">
         No donation data available. Connect devices to begin collecting data.
     </div>
 }

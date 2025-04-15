@@ -29,31 +29,46 @@
     <!-- Search and filter -->
     <div class="card mb-3">
         <div class="card-body">
-            <form asp-action="Index" method="get" class="row g-3">
+            <form asp-action="Index" method="get" id="filterForm" class="row g-3">
                 <div class="col-md-6">
                     <div class="input-group">
                         <input type="text" class="form-control" placeholder="Search donation ID, device ID, operator..."
                                name="searchString" value="@ViewBag.CurrentFilter">
                         <button class="btn btn-primary" type="submit">Search</button>
-                        <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
+                        <a asp-action="Index" asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary">Clear</a>
                     </div>
                 </div>
-                <div class="col-md-6 text-end">
-                    <div class="btn-group" role="group">
+                <div class="col-md-6 text-end d-flex align-items-center justify-content-end">
+                    <!-- Sorting button group -->
+                    <div class="btn-group me-3" role="group">
                         <a asp-action="Index" asp-route-sortOrder="@ViewBag.TimestampSortParm"
-                           asp-route-currentFilter="@ViewBag.CurrentFilter" class="btn btn-outline-secondary">
+                           asp-route-currentFilter="@ViewBag.CurrentFilter"
+                           asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary">
                             <i class="bi bi-clock"></i> Date
                         </a>
                         <a asp-action="Index" asp-route-sortOrder="@ViewBag.DeviceSortParm"
-                           asp-route-currentFilter="@ViewBag.CurrentFilter" class="btn btn-outline-secondary">
+                           asp-route-currentFilter="@ViewBag.CurrentFilter"
+                           asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary">
                             <i class="bi bi-hdd"></i> Device
                         </a>
                         <a asp-action="Index" asp-route-sortOrder="@ViewBag.LipemicValueSortParm"
-                           asp-route-currentFilter="@ViewBag.CurrentFilter" class="btn btn-outline-secondary">
+                           asp-route-currentFilter="@ViewBag.CurrentFilter"
+                           asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary">
                             <i class="bi bi-sort-numeric-down"></i> Value
                         </a>
                     </div>
+
+                    <!-- Today Only toggle -->
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="todayOnlyToggle"
+                        @(ViewBag.TodayOnly ? "checked" : "")>
+                        <label class="form-check-label" for="todayOnlyToggle">Today Only</label>
+                    </div>
                 </div>
+
+                <!-- Hidden inputs to maintain state -->
+                <input type="hidden" name="sortOrder" value="@ViewBag.CurrentSort" />
+                <input type="hidden" name="todayOnly" id="todayOnlyHidden" value="@ViewBag.TodayOnly.ToString().ToLower()" />
             </form>
         </div>
     </div>
@@ -72,31 +87,36 @@
                             <tr>
                                 <th>
                                     <a asp-action="Index" asp-route-sortOrder="@ViewBag.DonationIdSortParm"
-                                       asp-route-currentFilter="@ViewBag.CurrentFilter" class="text-decoration-none text-dark">
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@(ViewBag.TodayOnly)" class="text-decoration-none text-dark">
                                         Donation ID
                                     </a>
                                 </th>
                                 <th>
                                     <a asp-action="Index" asp-route-sortOrder="@ViewBag.DeviceSortParm"
-                                       asp-route-currentFilter="@ViewBag.CurrentFilter" class="text-decoration-none text-dark">
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@(ViewBag.TodayOnly)" class="text-decoration-none text-dark">
                                         Device
                                     </a>
                                 </th>
                                 <th>
                                     <a asp-action="Index" asp-route-sortOrder="@ViewBag.TimestampSortParm"
-                                       asp-route-currentFilter="@ViewBag.CurrentFilter" class="text-decoration-none text-dark">
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@(ViewBag.TodayOnly)" class="text-decoration-none text-dark">
                                         Date/Time
                                     </a>
                                 </th>
                                 <th>
                                     <a asp-action="Index" asp-route-sortOrder="@ViewBag.LipemicValueSortParm"
-                                       asp-route-currentFilter="@ViewBag.CurrentFilter" class="text-decoration-none text-dark">
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@(ViewBag.TodayOnly)" class="text-decoration-none text-dark">
                                         Lipemic Value
                                     </a>
                                 </th>
                                 <th>
                                     <a asp-action="Index" asp-route-sortOrder="@ViewBag.LipemicGroupSortParm"
-                                       asp-route-currentFilter="@ViewBag.CurrentFilter" class="text-decoration-none text-dark">
+                                       asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@(ViewBag.TodayOnly)" class="text-decoration-none text-dark">
                                         Lipemic Group
                                     </a>
                                 </th>
@@ -177,6 +197,14 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if (!Model.Any())
+                {
+                    <div class="alert alert-info m-3">
+                        No donation data available. Connect devices to begin collecting data.
+                    </div>
+                }
+
             </div>
         </div>
 
@@ -196,6 +224,7 @@
                                        asp-route-sortOrder="@ViewBag.CurrentSort"
                                        asp-route-pageNumber="@(Model.PageIndex - 1)"
                                        asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@ViewBag.TodayOnly"
                                        class="page-link">
                                         Previous
                                     </a>
@@ -215,6 +244,7 @@
                                        asp-route-sortOrder="@ViewBag.CurrentSort"
                                        asp-route-pageNumber="@i"
                                        asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@ViewBag.TodayOnly"
                                        class="page-link">
                                         @i
                                     </a>
@@ -228,6 +258,7 @@
                                        asp-route-sortOrder="@ViewBag.CurrentSort"
                                        asp-route-pageNumber="@(Model.PageIndex + 1)"
                                        asp-route-currentFilter="@ViewBag.CurrentFilter"
+                                       asp-route-todayOnly="@ViewBag.TodayOnly"
                                        class="page-link">
                                         Next
                                     </a>
@@ -245,13 +276,6 @@
             </div>
         </div>
     </div>
-
-    @if (!Model.Any())
-    {
-        <div class="alert alert-info">
-            No donation data available. Connect devices to begin collecting data.
-        </div>
-    }
 </div>
 
 @section Scripts {
@@ -272,18 +296,23 @@
                     data: {
                         sortOrder: '@ViewBag.CurrentSort',
                         currentFilter: '@ViewBag.CurrentFilter',
-                        pageNumber: '@Model.PageIndex'
+                        pageNumber: '@Model.PageIndex',
+                        todayOnly: $('#todayOnlyToggle').is(':checked')
                     },
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'  // Mark as AJAX request
                     },
                     success: function (result) {
-                        // Replace only the table content inside the donation list container
+                        // Replace the entire container content
                         $('#donationListContainer').html(result);
                         updateLastRefreshTime();
                     },
                     error: function (error) {
                         console.error("Error refreshing donation list:", error);
+                        // Show an error alert in case of AJAX failure
+                        $('#donationListContainer').append(
+                            '<div class="alert alert-danger m-3">Error refreshing donation data. Please try again.</div>'
+                        );
                     }
                 });
             }
@@ -351,6 +380,15 @@
                 } else {
                     stopAutoRefresh();
                 }
+            });
+
+            // Handle today only toggle:
+            $('#todayOnlyToggle').change(function() {
+                // Update the hidden input with the current toggle state
+                $('#todayOnlyHidden').val($(this).is(':checked'));
+
+                // Submit the form to apply the filter
+                $('#filterForm').submit();
             });
         });
     </script>

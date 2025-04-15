@@ -23,7 +23,7 @@ namespace DeviceDataCollector.Controllers
         }
 
         // GET: Donations
-        public async Task<IActionResult> Index(string sortOrder, string currentFilter, string searchString, int? pageNumber)
+        public async Task<IActionResult> Index(string sortOrder, string currentFilter, string searchString, int? pageNumber, bool? todayOnly = null)
         {
             ViewBag.CurrentSort = sortOrder;
             ViewBag.TimestampSortParm = String.IsNullOrEmpty(sortOrder) ? "timestamp_desc" : "";
@@ -31,6 +31,10 @@ namespace DeviceDataCollector.Controllers
             ViewBag.DonationIdSortParm = sortOrder == "donation_id" ? "donation_id_desc" : "donation_id";
             ViewBag.LipemicValueSortParm = sortOrder == "lipemic_value" ? "lipemic_value_desc" : "lipemic_value";
             ViewBag.LipemicGroupSortParm = sortOrder == "lipemic_group" ? "lipemic_group_desc" : "lipemic_group";
+
+            // Fix: Make sure todayOnly is properly handled with a default value of true
+            bool todayOnlyValue = todayOnly ?? true;
+            ViewBag.TodayOnly = todayOnlyValue;
 
             if (searchString != null)
             {
@@ -44,6 +48,13 @@ namespace DeviceDataCollector.Controllers
             ViewBag.CurrentFilter = searchString;
 
             var query = _context.DonationsData.AsQueryable();
+
+            // Apply today only filter if enabled
+            if (todayOnlyValue)
+            {
+                DateTime yesterday = DateTime.Now.AddDays(-1);
+                query = query.Where(d => d.Timestamp >= yesterday);
+            }
 
             // Apply search filter if provided
             if (!String.IsNullOrEmpty(searchString))
