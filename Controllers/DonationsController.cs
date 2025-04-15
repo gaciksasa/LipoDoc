@@ -26,7 +26,7 @@ namespace DeviceDataCollector.Controllers
         public async Task<IActionResult> Index(string sortOrder, string currentFilter, string searchString, int? pageNumber, bool? todayOnly = null)
         {
             ViewBag.CurrentSort = sortOrder;
-            ViewBag.TimestampSortParm = String.IsNullOrEmpty(sortOrder) ? "timestamp_desc" : "";
+            ViewBag.TimestampSortParm = sortOrder == "timestamp_asc" ? "timestamp_desc" : "timestamp_asc";
             ViewBag.DeviceSortParm = sortOrder == "device" ? "device_desc" : "device";
             ViewBag.DonationIdSortParm = sortOrder == "donation_id" ? "donation_id_desc" : "donation_id";
             ViewBag.LipemicValueSortParm = sortOrder == "lipemic_value" ? "lipemic_value_desc" : "lipemic_value";
@@ -72,6 +72,9 @@ namespace DeviceDataCollector.Controllers
             {
                 case "timestamp_desc":
                     query = query.OrderByDescending(d => d.Timestamp);
+                    break;
+                case "timestamp_asc":
+                    query = query.OrderBy(d => d.Timestamp);
                     break;
                 case "device":
                     query = query.OrderBy(d => d.DeviceId);
