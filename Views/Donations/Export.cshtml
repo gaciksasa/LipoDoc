@@ -1,0 +1,183 @@
+﻿@model DeviceDataCollector.Models.ExportViewModel
+
+@{
+    ViewData["Title"] = "Export Donations";
+}
+
+<div class="container">
+    <div class="row mb-3">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+                    <li class="breadcrumb-item"><a asp-controller="Donations" asp-action="Index">Donations</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Export</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <h1 class="mb-4">Export Donations to CSV</h1>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Export Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="ExportData" method="post" id="exportForm">
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h6 class="mb-3">Select columns to export:</h6>
+                                <div class="row" id="columnSelection">
+                                    @foreach (var column in Model.AvailableColumns)
+                                    {
+                                        <div class="col-md-4 mb-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input column-checkbox" type="checkbox"
+                                                       value="@column.Id" id="column_@column.Id"
+                                                       name="SelectedColumns" @(column.Selected ? "checked" : "")>
+                                                <label class="form-check-label" for="column_@column.Id">
+                                                    @column.Name
+                                                </label>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="selectAllColumns">Select All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllColumns">Deselect All</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="row mb-4">
+                            <h6 class="mb-3">Filter options:</h6>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="StartDate" class="form-label">Start Date</label>
+                                <input asp-for="StartDate" class="form-control" type="date">
+                                <span asp-validation-for="StartDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="EndDate" class="form-label">End Date</label>
+                                <input asp-for="EndDate" class="form-control" type="date">
+                                <span asp-validation-for="EndDate" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="DeviceId" class="form-label">Device</label>
+                                <select asp-for="DeviceId" asp-items="Model.AvailableDevices" class="form-select">
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="row mb-4">
+                            <h6 class="mb-3">Format options:</h6>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="Delimiter" class="form-label">Column Delimiter</label>
+                                <select asp-for="Delimiter" asp-items="Model.DelimiterOptions" class="form-select">
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="DateFormat" class="form-label">Date Format</label>
+                                <select asp-for="DateFormat" asp-items="Model.DateFormatOptions" class="form-select">
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="TimeFormat" class="form-label">Time Format</label>
+                                <select asp-for="TimeFormat" asp-items="Model.TimeFormatOptions" class="form-select">
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            The export will include all donations that match your filter criteria. For large datasets, the export might take a few moments.
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a asp-action="Index" class="btn btn-secondary">Back to Donations</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-download"></i> Export to CSV
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Export Help</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Column Selection</h6>
+                    <p>Select the columns you want to include in your CSV export. The order of columns in the exported file will match the order shown here.</p>
+
+                    <h6>Date & Time Formats</h6>
+                    <p>Select how dates and times should be formatted in the export file:</p>
+                    <ul>
+                        <li><code>yyyy-MM-dd</code>: 2025-04-16</li>
+                        <li><code>dd.MM.yyyy</code>: 16.04.2025</li>
+                        <li><code>MM/dd/yyyy</code>: 04/16/2025</li>
+                        <li><code>HH:mm:ss</code>: 14:30:00 (24-hour)</li>
+                        <li><code>hh:mm:ss tt</code>: 02:30:00 PM (12-hour)</li>
+                    </ul>
+
+                    <h6>Delimiter Options</h6>
+                    <p>The column delimiter determines how values are separated in the CSV file:</p>
+                    <ul>
+                        <li>Comma: Standard for CSV files</li>
+                        <li>Semicolon: Used in regions where comma is a decimal separator</li>
+                        <li>Tab: Better for data with commas in values</li>
+                        <li>Pipe: Alternative separator for complex data</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Handle Select All button
+            $('#selectAllColumns').click(function() {
+                $('.column-checkbox').prop('checked', true);
+            });
+
+            // Handle Deselect All button
+            $('#deselectAllColumns').click(function() {
+                $('.column-checkbox').prop('checked', false);
+            });
+
+            // Form validation for export
+            $('#exportForm').submit(function(e) {
+                // Check if at least one column is selected
+                if ($('.column-checkbox:checked').length === 0) {
+                    e.preventDefault();
+                    alert('Please select at least one column to export');
+                    return false;
+                }
+
+                // Validate date range
+                const startDate = $('#StartDate').val();
+                const endDate = $('#EndDate').val();
+
+                if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+                    e.preventDefault();
+                    alert('Start date cannot be later than end date');
+                    return false;
+                }
+
+                // If all validations pass, return true to submit the form
+                return true;
+            });
+        });
+    </script>
+}

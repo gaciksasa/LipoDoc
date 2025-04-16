@@ -4,6 +4,12 @@ using DeviceDataCollector.Data;
 using Microsoft.AspNetCore.Authorization;
 using DeviceDataCollector.Models;
 using DeviceDataCollector.Controllers;
+using System.Text;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace DeviceDataCollector.Controllers
 {
@@ -244,6 +250,194 @@ namespace DeviceDataCollector.Controllers
         private bool DonationsDataExists(int id)
         {
             return _context.DonationsData.Any(e => e.Id == id);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Export()
+        {
+            // Create a view model with all available columns
+            var model = new ExportViewModel
+            {
+                AvailableColumns = new List<ColumnSelectionItem>
+        {
+            new ColumnSelectionItem { Id = "DonationIdBarcode", Name = "Donation ID", Selected = true },
+            new ColumnSelectionItem { Id = "DeviceId", Name = "Device ID", Selected = true },
+            new ColumnSelectionItem { Id = "Timestamp", Name = "Timestamp", Selected = true },
+            new ColumnSelectionItem { Id = "LipemicValue", Name = "Lipemic Value", Selected = true },
+            new ColumnSelectionItem { Id = "LipemicGroup", Name = "Lipemic Group", Selected = true },
+            new ColumnSelectionItem { Id = "LipemicStatus", Name = "Lipemic Status", Selected = true },
+            new ColumnSelectionItem { Id = "RefCode", Name = "Reference Code", Selected = false },
+            new ColumnSelectionItem { Id = "OperatorIdBarcode", Name = "Operator ID", Selected = true },
+            new ColumnSelectionItem { Id = "LotNumber", Name = "Lot Number", Selected = true },
+            new ColumnSelectionItem { Id = "MessageType", Name = "Message Type", Selected = false },
+            new ColumnSelectionItem { Id = "IPAddress", Name = "IP Address", Selected = false },
+            new ColumnSelectionItem { Id = "Port", Name = "Port", Selected = false }
+        },
+                Delimiter = ",",
+                DateFormat = "yyyy-MM-dd",
+                TimeFormat = "HH:mm:ss"
+            };
+
+            try
+            {
+                // Get list of unique device IDs from donations table
+                var deviceIds = await _context.DonationsData
+                    .Select(d => d.DeviceId)
+                    .Distinct()
+                    .Where(d => !string.IsNullOrEmpty(d))
+                    .OrderBy(d => d)
+                    .ToListAsync();
+
+                // Get device names from devices table
+                var deviceList = await _context.Devices
+                    .OrderBy(d => d.SerialNumber)
+                    .ToListAsync();
+
+                // Create select list items with device details
+                var deviceItems = new List<SelectListItem>();
+                foreach (var deviceId in deviceIds)
+                {
+                    var device = deviceList.FirstOrDefault(d => d.SerialNumber == deviceId);
+                    string displayName = device != null && !string.IsNullOrEmpty(device.Name)
+                        ? $"{device.Name} ({deviceId})"
+                        : deviceId;
+
+                    deviceItems.Add(new SelectListItem
+                    {
+                        Value = deviceId,
+                        Text = displayName
+                    });
+                }
+
+                // Add "All Devices" option at the top
+                deviceItems.Insert(0, new SelectListItem { Value = "", Text = "-- All Devices --" });
+
+                // Assign to model
+                model.AvailableDevices = deviceItems;
+
+                _logger.LogInformation($"Populated device dropdown with {deviceItems.Count - 1} devices");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading device list for export dropdown");
+                // Create a default empty list with just the "All Devices" option
+                model.AvailableDevices = new List<SelectListItem>
+        {
+            new SelectListItem { Value = "", Text = "-- All Devices --" }
+        };
+            }
+
+            // Set default date range to last 30 days
+            model.StartDate = DateTime.Now.AddDays(-30).Date;
+            model.EndDate = DateTime.Now.Date;
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExportData(ExportViewModel model)
+        {
+            if (!model.SelectedColumns.Any())
+            {
+                // If no columns are selected, select Donation ID, Device, and Timestamp
+                model.SelectedColumns = new List<string> { "DonationIdBarcode", "DeviceId", "Timestamp" };
+            }
+
+            // Get the data from the database based on filters
+            var query = _context.DonationsData.AsQueryable();
+
+            // Apply date range filter if provided
+            if (model.StartDate.HasValue)
+            {
+                query = query.Where(d => d.Timestamp >= model.StartDate.Value);
+            }
+
+            if (model.EndDate.HasValue)
+            {
+                // Add one day to include the end date fully
+                var endDatePlusOne = model.EndDate.Value.AddDays(1);
+                query = query.Where(d => d.Timestamp < endDatePlusOne);
+            }
+
+            // Apply device filter if provided
+            if (!string.IsNullOrEmpty(model.DeviceId))
+            {
+                query = query.Where(d => d.DeviceId == model.DeviceId);
+            }
+
+            // Order by timestamp descending (newest first)
+            var donations = await query
+                .OrderByDescending(d => d.Timestamp)
+                .ToListAsync();
+
+            // Generate CSV content
+            var csv = new StringBuilder();
+
+            // Add header
+            var headerLine = string.Join(model.Delimiter, model.SelectedColumns.Select(c => $"\"{GetColumnDisplayName(c)}\""));
+            csv.AppendLine(headerLine);
+
+            // Add data rows
+            foreach (var donation in donations)
+            {
+                var row = new List<string>();
+
+                foreach (var column in model.SelectedColumns)
+                {
+                    string value = GetPropertyValue(donation, column, model.DateFormat, model.TimeFormat);
+                    // Quote the value and escape any quotes inside it
+                    row.Add($"\"{value.Replace("\"", "\"\"")}\"");
+                }
+
+                csv.AppendLine(string.Join(model.Delimiter, row));
+            }
+
+            // Generate file name
+            string fileName = $"Donations_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+
+            // Return CSV file
+            byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
+            return File(bytes, "text/csv", fileName);
+        }
+
+        private string GetColumnDisplayName(string columnId)
+        {
+            return columnId switch
+            {
+                "DonationIdBarcode" => "Donation ID",
+                "DeviceId" => "Device ID",
+                "Timestamp" => "Timestamp",
+                "LipemicValue" => "Lipemic Value",
+                "LipemicGroup" => "Lipemic Group",
+                "LipemicStatus" => "Lipemic Status",
+                "RefCode" => "Reference Code",
+                "OperatorIdBarcode" => "Operator ID",
+                "LotNumber" => "Lot Number",
+                "MessageType" => "Message Type",
+                "IPAddress" => "IP Address",
+                "Port" => "Port",
+                _ => columnId
+            };
+        }
+
+        private string GetPropertyValue(DonationsData donation, string propertyName, string dateFormat, string timeFormat)
+        {
+            return propertyName switch
+            {
+                "DonationIdBarcode" => donation.DonationIdBarcode ?? string.Empty,
+                "DeviceId" => donation.DeviceId ?? string.Empty,
+                "Timestamp" => donation.Timestamp.ToString($"{dateFormat} {timeFormat}"),
+                "LipemicValue" => donation.LipemicValue?.ToString() ?? string.Empty,
+                "LipemicGroup" => donation.LipemicGroup ?? string.Empty,
+                "LipemicStatus" => donation.LipemicStatus ?? string.Empty,
+                "RefCode" => donation.RefCode ?? string.Empty,
+                "OperatorIdBarcode" => donation.OperatorIdBarcode ?? string.Empty,
+                "LotNumber" => donation.LotNumber ?? string.Empty,
+                "MessageType" => donation.MessageType ?? string.Empty,
+                "IPAddress" => donation.IPAddress ?? string.Empty,
+                "Port" => donation.Port.ToString(),
+                _ => string.Empty
+            };
         }
     }
 }
