@@ -11,6 +11,14 @@ namespace DeviceDataCollector.Models
         // Columns selected by the user
         public List<string> SelectedColumns { get; set; } = new List<string>();
 
+        // Column ordering
+        public List<string> ColumnOrder { get; set; } = new List<string>();
+
+        // Empty columns to add
+        [Display(Name = "Empty Columns")]
+        [Range(0, 20, ErrorMessage = "Empty columns count must be between 0 and 20")]
+        public int EmptyColumnsCount { get; set; } = 0;
+
         // Filter options
         [Display(Name = "Start Date")]
         [DataType(DataType.Date)]

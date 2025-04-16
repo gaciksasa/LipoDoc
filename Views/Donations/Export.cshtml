@@ -52,6 +52,62 @@
                             </div>
                         </div>
 
+                        <!-- Column Ordering and Empty Columns Section -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        Drag and drop columns to reorder them in the export file.
+                                    </div>
+
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <span>Column Order</span>
+                                            <div class="input-group input-group-sm" style="max-width: 300px;">
+                                                <input type="text" class="form-control" id="emptyColumnName"
+                                                       placeholder="Empty Column Name (optional)">
+                                                <button class="btn btn-outline-primary" type="button" id="addEmptyColumnBtn">
+                                                    <i class="bi bi-plus-circle"></i> Add Empty Column
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <ul class="list-group" id="sortableColumns">
+                                                @foreach (var column in Model.SelectedColumns.Any() ?
+                                                Model.SelectedColumns.Select(id => Model.AvailableColumns.FirstOrDefault(c => c.Id == id)).Where(c => c != null) :
+                                                Model.AvailableColumns.Where(c => c.Selected))
+                                                {
+                                                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                                                        data-column-id="@column.Id">
+                                                        <span><i class="bi bi-grip-vertical me-2"></i>@column.Name</span>
+                                                        <input type="hidden" name="ColumnOrder" value="@column.Id" />
+                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-column-btn">
+                                                            <i class="bi bi-x"></i>
+                                                        </button>
+                                                    </li>
+                                                }
+                                                @for (int i = 0; i < Model.EmptyColumnsCount; i++)
+                                                {
+                                                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                                                        data-column-id="empty_@i">
+                                                        <span><i class="bi bi-grip-vertical me-2"></i>Empty Column @(i + 1)</span>
+                                                        <input type="hidden" name="ColumnOrder" value="empty_@i" />
+                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-column-btn">
+                                                            <i class="bi bi-x"></i>
+                                                        </button>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Hidden input to keep track of empty columns count -->
+                                <input type="hidden" id="EmptyColumnsCount" name="EmptyColumnsCount" value="@Model.EmptyColumnsCount">
+                            </div>
+                        </div>
+
                         <hr class="my-4">
 
                         <div class="row mb-4">
@@ -117,7 +173,13 @@
                 </div>
                 <div class="card-body">
                     <h6>Column Selection</h6>
-                    <p>Select the columns you want to include in your CSV export. The order of columns in the exported file will match the order shown here.</p>
+                    <p>Select the columns you want to include in your CSV export.</p>
+
+                    <h6>Column Ordering</h6>
+                    <p>Enable column sorting to arrange the order of columns in your export. Drag and drop to reorder.</p>
+
+                    <h6>Empty Columns</h6>
+                    <p>Add blank columns to the export file that you can manually fill in later.</p>
 
                     <h6>Date & Time Formats</h6>
                     <p>Select how dates and times should be formatted in the export file:</p>
@@ -144,24 +206,180 @@
 </div>
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
     <script>
         $(document).ready(function() {
+            // Initialize Sortable.js for column ordering
+            var sortableColumns = document.getElementById('sortableColumns');
+            if (sortableColumns) {
+                new Sortable(sortableColumns, {
+                    animation: 150,
+                    handle: '.bi-grip-vertical',
+                    onSort: function(evt) {
+                        // Update hidden inputs for column order
+                        updateColumnOrderInputs();
+                    }
+                });
+            }
+
+            // Initialize empty column counter
+            let emptyColumnCounter = @Model.EmptyColumnsCount;
+
+            // Function to update hidden inputs for column order
+            function updateColumnOrderInputs() {
+                // Remove existing hidden inputs
+                $('#sortableColumns').find('input[name="ColumnOrder"]').remove();
+
+                // Add new hidden inputs based on current order
+                $('#sortableColumns li').each(function() {
+                    var columnId = $(this).data('column-id');
+                    $(this).append('<input type="hidden" name="ColumnOrder" value="' + columnId + '" />');
+                });
+
+                // Update empty columns count
+                updateEmptyColumnsCount();
+            }
+
+            // Function to update the empty columns count
+            function updateEmptyColumnsCount() {
+                let emptyCount = 0;
+                $('#sortableColumns li').each(function() {
+                    if ($(this).data('column-id').toString().startsWith('empty_')) {
+                        emptyCount++;
+                    }
+                });
+                $('#EmptyColumnsCount').val(emptyCount);
+            }
+
+            // Add Empty Column button handler
+            $('#addEmptyColumnBtn').click(function() {
+                if (emptyColumnCounter >= 20) {
+                    alert('Maximum of 20 empty columns allowed');
+                    return;
+                }
+
+                const customName = $('#emptyColumnName').val().trim();
+                const columnName = customName ? customName : 'Empty Column ' + (emptyColumnCounter + 1);
+                const columnId = 'empty_' + emptyColumnCounter;
+
+                // Create new list item
+                const newItem = $('<li>')
+                    .addClass('list-group-item d-flex justify-content-between align-items-center')
+                    .attr('data-column-id', columnId)
+                    .append('<span><i class="bi bi-grip-vertical me-2"></i>' + columnName + '</span>')
+                    .append('<input type="hidden" name="ColumnOrder" value="' + columnId + '" />')
+                    .append('<button type="button" class="btn btn-sm btn-outline-danger remove-column-btn"><i class="bi bi-x"></i></button>');
+
+                // Add to sortable list
+                $('#sortableColumns').append(newItem);
+
+                // Increment counter and update hidden input
+                emptyColumnCounter++;
+                updateEmptyColumnsCount();
+
+                // Clear input field
+                $('#emptyColumnName').val('');
+            });
+
+            // Remove column button handler (using event delegation for dynamically added buttons)
+            $(document).on('click', '.remove-column-btn', function() {
+                const listItem = $(this).closest('li');
+                const columnId = listItem.data('column-id');
+
+                // If it's a data column, uncheck the corresponding checkbox
+                if (!columnId.toString().startsWith('empty_')) {
+                    $('#column_' + columnId).prop('checked', false);
+                }
+
+                // Remove the list item
+                listItem.remove();
+
+                // Update column order and empty count
+                updateColumnOrderInputs();
+            });
+
+            // Update sortable list when column checkboxes change
+            $('.column-checkbox').change(function() {
+                var columnId = $(this).val();
+                var isChecked = $(this).is(':checked');
+                var columnName = $(this).closest('.form-check').find('label').text().trim();
+
+                if (isChecked) {
+                    // Check if this column already exists in the list
+                    if ($('#sortableColumns li[data-column-id="' + columnId + '"]').length === 0) {
+                        // Add the column to the sortable list
+                        var listItem = $('<li>')
+                            .addClass('list-group-item d-flex justify-content-between align-items-center')
+                            .attr('data-column-id', columnId)
+                            .append('<span><i class="bi bi-grip-vertical me-2"></i>' + columnName + '</span>')
+                            .append('<input type="hidden" name="ColumnOrder" value="' + columnId + '" />')
+                            .append('<button type="button" class="btn btn-sm btn-outline-danger remove-column-btn"><i class="bi bi-x"></i></button>');
+
+                        $('#sortableColumns').append(listItem);
+                    }
+                } else {
+                    // Remove the column from the sortable list
+                    $('#sortableColumns li[data-column-id="' + columnId + '"]').remove();
+                }
+
+                // Update hidden inputs
+                updateColumnOrderInputs();
+            });
+
+            // Function to update the sortable list based on selected columns
+            function updateSortableList() {
+                // Get all currently selected column IDs (including empty columns)
+                const currentEmptyColumns = $('#sortableColumns li').filter(function() {
+                    return $(this).data('column-id').toString().startsWith('empty_');
+                }).clone(true);
+
+                // Clear only the data columns (not empty columns)
+                $('#sortableColumns li').not(function() {
+                    return $(this).data('column-id').toString().startsWith('empty_');
+                }).remove();
+
+                // Add all checked columns to the sortable list
+                $('.column-checkbox:checked').each(function() {
+                    var columnId = $(this).val();
+                    var columnName = $(this).closest('.form-check').find('label').text().trim();
+
+                    // Skip if this column is already in the list
+                    if ($('#sortableColumns li[data-column-id="' + columnId + '"]').length > 0) {
+                        return;
+                    }
+
+                    var listItem = $('<li>')
+                        .addClass('list-group-item d-flex justify-content-between align-items-center')
+                        .attr('data-column-id', columnId)
+                        .append('<span><i class="bi bi-grip-vertical me-2"></i>' + columnName + '</span>')
+                        .append('<input type="hidden" name="ColumnOrder" value="' + columnId + '" />')
+                        .append('<button type="button" class="btn btn-sm btn-outline-danger remove-column-btn"><i class="bi bi-x"></i></button>');
+
+                    $('#sortableColumns').append(listItem);
+                });
+
+                // Update hidden inputs
+                updateColumnOrderInputs();
+            }
+
             // Handle Select All button
             $('#selectAllColumns').click(function() {
                 $('.column-checkbox').prop('checked', true);
+                updateSortableList();
             });
 
             // Handle Deselect All button
             $('#deselectAllColumns').click(function() {
                 $('.column-checkbox').prop('checked', false);
+                updateSortableList();
             });
 
             // Form validation for export
             $('#exportForm').submit(function(e) {
-                // Check if at least one column is selected
-                if ($('.column-checkbox:checked').length === 0) {
+                // Check if at least one column or empty column is selected
+                if ($('#sortableColumns li').length === 0) {
                     e.preventDefault();
-                    alert('Please select at least one column to export');
+                    alert('Please select at least one column to export or add an empty column');
                     return false;
                 }
 

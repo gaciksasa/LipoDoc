@@ -275,8 +275,15 @@ namespace DeviceDataCollector.Controllers
         },
                 Delimiter = ",",
                 DateFormat = "yyyy-MM-dd",
-                TimeFormat = "HH:mm:ss"
+                TimeFormat = "HH:mm:ss",
+                EmptyColumnsCount = 0
             };
+
+            // Initialize ColumnOrder with default selected columns
+            model.ColumnOrder = model.AvailableColumns
+                .Where(c => c.Selected)
+                .Select(c => c.Id)
+                .ToList();
 
             try
             {
@@ -337,12 +344,6 @@ namespace DeviceDataCollector.Controllers
         [HttpPost]
         public async Task<IActionResult> ExportData(ExportViewModel model)
         {
-            if (!model.SelectedColumns.Any())
-            {
-                // If no columns are selected, select Donation ID, Device, and Timestamp
-                model.SelectedColumns = new List<string> { "DonationIdBarcode", "DeviceId", "Timestamp" };
-            }
-
             // Get the data from the database based on filters
             var query = _context.DonationsData.AsQueryable();
 
@@ -373,8 +374,45 @@ namespace DeviceDataCollector.Controllers
             // Generate CSV content
             var csv = new StringBuilder();
 
+            // Process column order
+            List<string> columnsInOrder = model.ColumnOrder;
+
+            // Extract data columns and empty columns
+            var dataColumns = new List<string>();
+            var emptyColumns = new List<string>();
+
+            foreach (var column in columnsInOrder)
+            {
+                if (column.StartsWith("empty_"))
+                {
+                    emptyColumns.Add(column);
+                }
+                else
+                {
+                    dataColumns.Add(column);
+                }
+            }
+
             // Add header
-            var headerLine = string.Join(model.Delimiter, model.SelectedColumns.Select(c => $"\"{GetColumnDisplayName(c)}\""));
+            var headerParts = new List<string>();
+
+            // Process each column according to its type
+            foreach (var column in columnsInOrder)
+            {
+                if (column.StartsWith("empty_"))
+                {
+                    // Empty column - use a default name or the name provided
+                    int emptyIndex = int.Parse(column.Substring(6));
+                    headerParts.Add($"\"Empty {emptyIndex + 1}\"");
+                }
+                else
+                {
+                    // Regular data column
+                    headerParts.Add($"\"{GetColumnDisplayName(column)}\"");
+                }
+            }
+
+            var headerLine = string.Join(model.Delimiter, headerParts);
             csv.AppendLine(headerLine);
 
             // Add data rows
@@ -382,11 +420,21 @@ namespace DeviceDataCollector.Controllers
             {
                 var row = new List<string>();
 
-                foreach (var column in model.SelectedColumns)
+                // Add data for columns in the specified order
+                foreach (var column in columnsInOrder)
                 {
-                    string value = GetPropertyValue(donation, column, model.DateFormat, model.TimeFormat);
-                    // Quote the value and escape any quotes inside it
-                    row.Add($"\"{value.Replace("\"", "\"\"")}\"");
+                    if (column.StartsWith("empty_"))
+                    {
+                        // Empty column - add an empty string
+                        row.Add("\"\"");
+                    }
+                    else
+                    {
+                        // Regular data column - get the actual value
+                        string value = GetPropertyValue(donation, column, model.DateFormat, model.TimeFormat);
+                        // Quote the value and escape any quotes inside it
+                        row.Add($"\"{value.Replace("\"", "\"\"")}\"");
+                    }
                 }
 
                 csv.AppendLine(string.Join(model.Delimiter, row));
