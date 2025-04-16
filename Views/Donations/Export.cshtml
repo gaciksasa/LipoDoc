@@ -131,13 +131,27 @@
 
                         <hr class="my-4">
 
-                        <div class="row mb-4">
+                        <div class="row">
                             <h6 class="mb-3">Format options:</h6>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="IncludeHeaders" class="form-label">Headers</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input asp-for="IncludeHeaders" class="form-check-input" type="checkbox" role="switch" id="includeHeadersSwitch">
+                                    <label class="form-check-label" for="includeHeadersSwitch">Include column headers</label>
+                                </div>
+                            </div>
                             <div class="col-md-4 mb-3">
                                 <label asp-for="Delimiter" class="form-label">Column Delimiter</label>
                                 <select asp-for="Delimiter" asp-items="Model.DelimiterOptions" class="form-select">
                                 </select>
                             </div>
+                            <div class="col-md-4 mb-3" id="customSeparatorContainer" style="display: none;">
+                                <label asp-for="CustomSeparator" class="form-label">Custom Separator</label>
+                                <input asp-for="CustomSeparator" class="form-control" placeholder="Enter custom separator" maxlength="5">
+                                <span asp-validation-for="CustomSeparator" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="row mb-4">
                             <div class="col-md-4 mb-3">
                                 <label asp-for="DateFormat" class="form-label">Date Format</label>
                                 <select asp-for="DateFormat" asp-items="Model.DateFormatOptions" class="form-select">
@@ -198,6 +212,22 @@
                         <li>Semicolon: Used in regions where comma is a decimal separator</li>
                         <li>Tab: Better for data with commas in values</li>
                         <li>Pipe: Alternative separator for complex data</li>
+                    </ul>
+                    <h6>Export Options</h6>
+                    <p>The column delimiter determines how values are separated in the CSV file:</p>
+                    <ul>
+                        <li>Comma: Standard for CSV files</li>
+                        <li>Semicolon: Used in regions where comma is a decimal separator</li>
+                        <li>Tab: Better for data with commas in values</li>
+                        <li>Pipe: Alternative separator for complex data</li>
+                        <li>Custom: Use your own delimiter character(s)</li>
+                    </ul>
+
+                    <h6>Header Options</h6>
+                    <p>You can choose whether to include column headers in the exported file:</p>
+                    <ul>
+                        <li><strong>Include headers:</strong> The first row will contain column names</li>
+                        <li><strong>Exclude headers:</strong> The file will contain only data rows</li>
                     </ul>
                 </div>
             </div>
@@ -374,28 +404,53 @@
                 updateSortableList();
             });
 
+            // Handle custom delimiter field visibility
+            $('select[name="Delimiter"]').change(function() {
+                if ($(this).val() === 'custom') {
+                    $('#customSeparatorContainer').show();
+                } else {
+                    $('#customSeparatorContainer').hide();
+                }
+            });
+
+            // Check initial delimiter value on page load
+            if ($('select[name="Delimiter"]').val() === 'custom') {
+                $('#customSeparatorContainer').show();
+            }
+
             // Form validation for export
             $('#exportForm').submit(function(e) {
-                // Check if at least one column or empty column is selected
-                if ($('#sortableColumns li').length === 0) {
+            // Check if at least one column or empty column is selected
+            if ($('#sortableColumns li').length === 0) {
+                e.preventDefault();
+                alert('Please select at least one column to export or add an empty column');
+                return false;
+            }
+
+            // Validate date range
+            const startDate = $('#StartDate').val();
+            const endDate = $('#EndDate').val();
+
+            if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+                e.preventDefault();
+                alert('Start date cannot be later than end date');
+                return false;
+            }
+
+            // Validate custom separator if it's selected
+            if ($('#delimiterSelector').val() === 'custom') {
+                const customSeparator = $('#CustomSeparator').val();
+                if (!customSeparator) {
                     e.preventDefault();
-                    alert('Please select at least one column to export or add an empty column');
+                    alert('Please enter a custom separator');
+                    $('#CustomSeparator').focus();
                     return false;
                 }
+            }
 
-                // Validate date range
-                const startDate = $('#StartDate').val();
-                const endDate = $('#EndDate').val();
-
-                if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-                    e.preventDefault();
-                    alert('Start date cannot be later than end date');
-                    return false;
-                }
-
-                // If all validations pass, return true to submit the form
-                return true;
-            });
+            // If all validations pass, return true to submit the form
+            return true;
+        });
         });
     </script>
 }

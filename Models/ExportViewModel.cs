@@ -43,13 +43,20 @@ namespace DeviceDataCollector.Models
         [Display(Name = "Time Format")]
         public string TimeFormat { get; set; } = "HH:mm:ss";
 
+        [Display(Name = "Include Headers")]
+        public bool IncludeHeaders { get; set; } = true;
+
+        [Display(Name = "Custom Separator")]
+        public string CustomSeparator { get; set; } = "";
+
         // Delimiters to choose from
         public List<SelectListItem> DelimiterOptions => new List<SelectListItem>
         {
             new SelectListItem { Value = ",", Text = "Comma (,)" },
             new SelectListItem { Value = ";", Text = "Semicolon (;)" },
             new SelectListItem { Value = "\t", Text = "Tab" },
-            new SelectListItem { Value = "|", Text = "Pipe (|)" }
+            new SelectListItem { Value = "|", Text = "Pipe (|)" },
+            new SelectListItem { Value = "custom", Text = "Custom..." }
         };
 
         // Date formats to choose from

@@ -393,27 +393,37 @@ namespace DeviceDataCollector.Controllers
                 }
             }
 
-            // Add header
-            var headerParts = new List<string>();
-
-            // Process each column according to its type
-            foreach (var column in columnsInOrder)
+            // Determine which delimiter to use
+            string delimiter = model.Delimiter;
+            if (model.Delimiter == "custom" && !string.IsNullOrEmpty(model.CustomSeparator))
             {
-                if (column.StartsWith("empty_"))
-                {
-                    // Empty column - use a default name or the name provided
-                    int emptyIndex = int.Parse(column.Substring(6));
-                    headerParts.Add($"\"Empty {emptyIndex + 1}\"");
-                }
-                else
-                {
-                    // Regular data column
-                    headerParts.Add($"\"{GetColumnDisplayName(column)}\"");
-                }
+                delimiter = model.CustomSeparator;
             }
 
-            var headerLine = string.Join(model.Delimiter, headerParts);
-            csv.AppendLine(headerLine);
+            // Add header if IncludeHeaders is true
+            if (model.IncludeHeaders)
+            {
+                var headerParts = new List<string>();
+
+                // Process each column according to its type
+                foreach (var column in columnsInOrder)
+                {
+                    if (column.StartsWith("empty_"))
+                    {
+                        // Empty column - use a default name or the name provided
+                        int emptyIndex = int.Parse(column.Substring(6));
+                        headerParts.Add($"\"Empty {emptyIndex + 1}\"");
+                    }
+                    else
+                    {
+                        // Regular data column
+                        headerParts.Add($"\"{GetColumnDisplayName(column)}\"");
+                    }
+                }
+
+                var headerLine = string.Join(delimiter, headerParts);
+                csv.AppendLine(headerLine);
+            }
 
             // Add data rows
             foreach (var donation in donations)
@@ -437,7 +447,8 @@ namespace DeviceDataCollector.Controllers
                     }
                 }
 
-                csv.AppendLine(string.Join(model.Delimiter, row));
+                // Use the potentially custom delimiter
+                csv.AppendLine(string.Join(delimiter, row));
             }
 
             // Generate file name
