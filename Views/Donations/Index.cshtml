@@ -285,13 +285,28 @@
 
 @section Scripts {
     <script>
-        // Auto-refresh functionality
-        $(document).ready(function () {
+                $(document).ready(function () {
             // Variables for auto-refresh
             const refreshInterval = 10 * 1000; // 10 seconds
             let autoRefreshTimer;
             let secondsCounter;
             let secondsLeft = refreshInterval / 1000;
+
+            // Check if auto-refresh state is stored in session storage
+            const storedAutoRefresh = sessionStorage.getItem('autoRefreshEnabled');
+
+            // Set initial state (default to true if not stored)
+            let autoRefreshEnabled = storedAutoRefresh === null ? true : (storedAutoRefresh === 'true');
+
+            // Set the toggle to match the stored state
+            $('#autoRefreshToggle').prop('checked', autoRefreshEnabled);
+
+            // Initialize auto-refresh based on stored state
+            if (autoRefreshEnabled) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
 
             // Function to update donations list
             function refreshDonationsList() {
@@ -337,13 +352,24 @@
 
             // Function to update refresh status text with countdown
             function updateRefreshStatus() {
-                $('#refreshStatus').html(`<i class="bi bi-arrow-clockwise"></i> Auto-refreshing in ${secondsLeft} seconds | Last update: <span id="lastRefreshTime">${$('#lastRefreshTime').text()}</span>`);
+                if (autoRefreshEnabled) {
+                    $('#refreshStatus').html(`<i class="bi bi-arrow-clockwise"></i> Auto-refreshing in ${secondsLeft} seconds | Last update: <span id="lastRefreshTime">${$('#lastRefreshTime').text()}</span>`);
+                } else {
+                    $('#refreshStatus').html(`<i class="bi bi-clock-history"></i> Auto-refresh paused | Last update: <span id="lastRefreshTime">${$('#lastRefreshTime').text()}</span>`);
+                }
             }
 
             // Start auto-refresh timer
             function startAutoRefresh() {
                 // Clear any existing timers
                 stopAutoRefresh();
+
+                // Update state
+                autoRefreshEnabled = true;
+                sessionStorage.setItem('autoRefreshEnabled', 'true');
+
+                // Update UI
+                $('#autoRefreshToggle').prop('checked', true);
 
                 // Start new timer
                 autoRefreshTimer = setInterval(refreshDonationsList, refreshInterval);
@@ -355,25 +381,30 @@
                     updateRefreshStatus();
                 }, 1000);
 
-                $('#autoRefreshToggle').prop('checked', true);
+                updateRefreshStatus();
             }
 
             // Stop auto-refresh timer
             function stopAutoRefresh() {
+                // Clear timers
                 clearInterval(autoRefreshTimer);
                 clearInterval(secondsCounter);
-                $('#refreshStatus').html(`<i class="bi bi-clock-history"></i> Auto-refresh paused | Last update: <span id="lastRefreshTime">${$('#lastRefreshTime').text()}</span>`);
-                $('#autoRefreshToggle').prop('checked', false);
-            }
 
-            // Initialize auto-refresh
-            startAutoRefresh();
+                // Update state
+                autoRefreshEnabled = false;
+                sessionStorage.setItem('autoRefreshEnabled', 'false');
+
+                // Update UI
+                $('#autoRefreshToggle').prop('checked', false);
+                updateRefreshStatus();
+            }
 
             // Handle manual refresh button
             $('#manualRefresh').click(function () {
                 refreshDonationsList();
+
                 // If auto-refresh is on, restart the timer
-                if ($('#autoRefreshToggle').is(':checked')) {
+                if (autoRefreshEnabled) {
                     startAutoRefresh();
                 }
             });
@@ -387,7 +418,7 @@
                 }
             });
 
-            // Handle today only toggle:
+            // Handle today only toggle
             $('#todayOnlyToggle').change(function() {
                 // Update the hidden input with the current toggle state
                 $('#todayOnlyHidden').val($(this).is(':checked'));
