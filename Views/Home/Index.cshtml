@@ -18,9 +18,9 @@
                 <div class="card-body">
                     <div class="row align-items-center">
                         <div class="col-lg-6">
-                            <p><strong>Server is running at:</strong> @(Context.Request.Host.Host):@(Context.Request.Host.Port)</p>
+                            <div><strong>Server is running at:</strong> @(Context.Request.Host.Host):@(Context.Request.Host.Port)</div>
 
-                            <p>
+                            <div>
                                 <strong>Database:</strong>
                                 @if (ViewBag.DatabaseConnected)
                                 {
@@ -35,7 +35,7 @@
                                         and make sure MySQL server is running.
                                     </div>
                                 }
-                            </p>
+                            </div>
                         </div>
                         <div class="col-lg-6">
                             @if (ViewBag.DatabaseConnected)
