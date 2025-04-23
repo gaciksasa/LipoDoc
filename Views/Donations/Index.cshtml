@@ -9,13 +9,13 @@
 <div class="container">
     <h1 class="mb-4">Donations</h1>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
+    <div class="row d-flex justify-content-between align-items-center mb-3">
+        <div class="col-12 col-lg-6 mb-3">
             <div id="refreshStatus" class="text-muted small">
                 <i class="bi bi-arrow-clockwise"></i> Auto-refreshing every 10 seconds | Last update: <span id="lastRefreshTime">@DateTime.Now.ToString("HH:mm:ss")</span>
             </div>
         </div>
-        <div>
+        <div class="col-12 col-lg-6 text-end d-flex align-items-center justify-content-end">
             <button id="manualRefresh" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-arrow-clockwise"></i> Refresh Now
             </button>
@@ -27,20 +27,20 @@
     </div>
 
     <!-- Search and filter -->
-    <div class="card mb-3">
+    <div class="card bg-light mb-3">
         <div class="card-body">
             <form asp-action="Index" method="get" id="filterForm" class="row g-3">
-                <div class="col-md-6">
+                <div class="col-12 col-lg-6">
                     <div class="input-group">
                         <input type="text" class="form-control" placeholder="Search donation ID, device ID, operator..."
                                name="searchString" value="@ViewBag.CurrentFilter">
                         <button class="btn btn-primary" type="submit">Search</button>
-                        <a asp-action="Index" asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary">Clear</a>
+                        <a asp-action="Index" asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary bg-white">Clear</a>
                     </div>
                 </div>
-                <div class="col-md-6 text-end d-flex align-items-center justify-content-end">
+                <div class="col-12 col-lg-6 text-end d-flex align-items-center justify-content-end">
                     <!-- Sorting button group -->
-                    <div class="btn-group me-3" role="group">
+                    <div class="btn-group bg-white me-3" role="group">
                         <a asp-action="Index" asp-route-sortOrder="@ViewBag.TimestampSortParm"
                            asp-route-currentFilter="@ViewBag.CurrentFilter"
                            asp-route-todayOnly="@ViewBag.TodayOnly" class="btn btn-outline-secondary">
@@ -64,8 +64,8 @@
                     </a>
 
                     <!-- Today Only toggle -->
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="todayOnlyToggle"
+                    <div class="form-check form-switch d-flex align-items-center">
+                        <input class="form-check-input me-2" type="checkbox" id="todayOnlyToggle"
                         @(ViewBag.TodayOnly ? "checked" : "")>
                         <label class="form-check-label" for="todayOnlyToggle">Today Only</label>
                     </div>

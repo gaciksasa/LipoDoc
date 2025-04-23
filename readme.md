@@ -1,10 +1,10 @@
-# LipoDoc Data Collector
+# IQ Link
 
 A robust .NET 8 web application designed to collect, store, and manage data from blood lipemic testing devices over TCP/IP.
 
 ## Overview
 
-LipoDoc Data Collector is a centralized system that provides:
+IQ Link is a centralized system that provides:
 
 - Real-time data collection from blood lipemic testing devices
 - TCP/IP server for direct device communication
@@ -105,7 +105,7 @@ Stores system notifications for important events:
 
 ## Device Communication Protocol
 
-The LipoDoc Data Collector communicates with devices using a proprietary protocol. Key message types include:
+The IQ Link communicates with devices using a proprietary protocol. Key message types include:
 
 ### Status Messages (`#S`)
 ```

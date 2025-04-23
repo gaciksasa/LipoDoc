@@ -219,32 +219,32 @@ body {
 }
 
 /* Button styling */
-.btn-primary {
+.btn-primary, .btn-primary:active, .btn-primary:focus {
     background-color: var(--bs-primary);
     border-color: var(--bs-primary);
 }
 
-.btn-secondary {
+.btn-secondary, .btn-secondary:active, .btn-secondary:focus {
     background-color: var(--bs-secondary);
     border-color: var(--bs-secondary);
 }
 
-.btn-success {
+.btn-success, .btn-success:active, .btn-secondary:focus {
     background-color: var(--bs-success);
     border-color: var(--bs-success);
 }
 
-.btn-danger {
+.btn-danger, .btn-danger:active, .btn-danger:focus {
     background-color: var(--bs-danger);
     border-color: var(--bs-danger);
 }
 
-.btn-warning {
+.btn-warning, .btn-warning:active, .btn-warning:focus {
     background-color: var(--bs-warning);
     border-color: var(--bs-warning);
 }
 
-.btn-info {
+.btn-info, .btn-info:active, .btn-info:focus {
     background-color: var(--bs-info);
     border-color: var(--bs-info);
 }
