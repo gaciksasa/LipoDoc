@@ -19,8 +19,59 @@
 
     <h1 class="mb-4">Export Donations to CSV</h1>
 
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i> @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i> @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
     <div class="row">
         <div class="col-lg-8">
+            <!-- Configuration Selection Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Export Configuration</h5>
+                    <a asp-controller="Donations" asp-action="ExportSettings" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-gear"></i> Manage Configurations
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label class="form-label">Load Configuration</label>
+                            <select id="configSelector" class="form-select">
+                                @foreach (var config in Model.SavedConfigurations)
+                                {
+                                    if (config.Selected)
+                                    {
+                                        <option value="@config.Value" selected>@config.Text</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@config.Value">@config.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button id="loadConfigBtn" class="btn btn-primary w-100">
+                                <i class="bi bi-cloud-download"></i> Load Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">Export Settings</h5>
@@ -35,9 +86,18 @@
                                     {
                                         <div class="col-md-4 mb-2">
                                             <div class="form-check">
-                                                <input class="form-check-input column-checkbox" type="checkbox"
-                                                       value="@column.Id" id="column_@column.Id"
-                                                       name="SelectedColumns" @(column.Selected ? "checked" : "")>
+                                                @if (column.Selected)
+                                                {
+                                                    <input class="form-check-input column-checkbox" type="checkbox"
+                                                           value="@column.Id" id="column_@column.Id"
+                                                           name="SelectedColumns" checked>
+                                                }
+                                                else
+                                                {
+                                                    <input class="form-check-input column-checkbox" type="checkbox"
+                                                           value="@column.Id" id="column_@column.Id"
+                                                           name="SelectedColumns">
+                                                }
                                                 <label class="form-check-label" for="column_@column.Id">
                                                     @column.Name
                                                 </label>
@@ -74,25 +134,56 @@
                                         </div>
                                         <div class="card-body">
                                             <ul class="list-group" id="sortableColumns">
-                                                @foreach (var column in Model.SelectedColumns.Any() ?
-                                                Model.SelectedColumns.Select(id => Model.AvailableColumns.FirstOrDefault(c => c.Id == id)).Where(c => c != null) :
-                                                Model.AvailableColumns.Where(c => c.Selected))
+                                                @{
+                                                    var columnsToDisplay = new List<ColumnSelectionItem>();
+                                                    
+                                                    // If we have column order, use that
+                                                    if (Model.ColumnOrder.Any())
+                                                    {
+                                                        foreach (var columnId in Model.ColumnOrder)
+                                                        {
+                                                            if (columnId.StartsWith("empty_"))
+                                                            {
+                                                                int emptyIndex = int.Parse(columnId.Substring(6));
+                                                                columnsToDisplay.Add(new ColumnSelectionItem
+                                                                {
+                                                                    Id = columnId,
+                                                                    Name = $"Empty Column {emptyIndex + 1}"
+                                                                });
+                                                            }
+                                                            else
+                                                            {
+                                                                var column = Model.AvailableColumns.FirstOrDefault(c => c.Id == columnId);
+                                                                if (column != null)
+                                                                {
+                                                                    columnsToDisplay.Add(column);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        // Otherwise, show selected columns
+                                                        columnsToDisplay = Model.AvailableColumns.Where(c => c.Selected).ToList();
+                                                        
+                                                        // Add empty columns at the end
+                                                        for (int i = 0; i < Model.EmptyColumnsCount; i++)
+                                                        {
+                                                            columnsToDisplay.Add(new ColumnSelectionItem
+                                                            {
+                                                                Id = $"empty_{i}",
+                                                                Name = $"Empty Column {i + 1}"
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                @foreach (var column in columnsToDisplay)
                                                 {
                                                     <li class="list-group-item d-flex justify-content-between align-items-center"
                                                         data-column-id="@column.Id">
                                                         <span><i class="bi bi-grip-vertical me-2"></i>@column.Name</span>
                                                         <input type="hidden" name="ColumnOrder" value="@column.Id" />
-                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-column-btn">
-                                                            <i class="bi bi-x"></i>
-                                                        </button>
-                                                    </li>
-                                                }
-                                                @for (int i = 0; i < Model.EmptyColumnsCount; i++)
-                                                {
-                                                    <li class="list-group-item d-flex justify-content-between align-items-center"
-                                                        data-column-id="empty_@i">
-                                                        <span><i class="bi bi-grip-vertical me-2"></i>Empty Column @(i + 1)</span>
-                                                        <input type="hidden" name="ColumnOrder" value="empty_@i" />
                                                         <button type="button" class="btn btn-sm btn-outline-danger remove-column-btn">
                                                             <i class="bi bi-x"></i>
                                                         </button>
@@ -105,6 +196,7 @@
 
                                 <!-- Hidden input to keep track of empty columns count -->
                                 <input type="hidden" id="EmptyColumnsCount" name="EmptyColumnsCount" value="@Model.EmptyColumnsCount">
+                                <input type="hidden" id="SelectedConfigId" name="SelectedConfigId" value="@Model.SelectedConfigId">
                             </div>
                         </div>
 
@@ -163,6 +255,45 @@
                                 </select>
                             </div>
                         </div>
+                        
+                        <!-- Save Configuration Section -->
+                        <div class="card mb-4 bg-light">
+                            <div class="card-header">
+                                <h6 class="mb-0">Save Configuration</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="ConfigName" class="form-label">Configuration Name</label>
+                                        <input asp-for="ConfigName" class="form-control" placeholder="My Export Configuration" 
+                                               value="@Model.ConfigName">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label asp-for="ConfigDescription" class="form-label">Description (Optional)</label>
+                                        <input asp-for="ConfigDescription" class="form-control" placeholder="Description of this configuration"
+                                               value="@Model.ConfigDescription">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input asp-for="SaveAsNew" class="form-check-input" type="checkbox" id="saveAsNewCheckbox">
+                                            <label class="form-check-label" for="saveAsNewCheckbox">
+                                                Save as new configuration
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input asp-for="SetAsDefault" class="form-check-input" type="checkbox" id="setAsDefaultCheckbox">
+                                            <label class="form-check-label" for="setAsDefaultCheckbox">
+                                                Set as default configuration
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle me-2"></i>
@@ -170,7 +301,12 @@
                         </div>
 
                         <div class="d-flex justify-content-between mt-4">
-                            <a asp-action="Index" class="btn btn-secondary">Back to Donations</a>
+                            <div>
+                                <a asp-action="Index" class="btn btn-secondary me-2">Back to Donations</a>
+                                <button type="button" id="saveConfigBtn" class="btn btn-success">
+                                    <i class="bi bi-save"></i> Save Configuration
+                                </button>
+                            </div>
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-download"></i> Export to CSV
                             </button>
@@ -186,6 +322,9 @@
                     <h5 class="mb-0">Export Help</h5>
                 </div>
                 <div class="card-body">
+                    <h6>Configurations</h6>
+                    <p>Save your export settings to reuse them later. You can create multiple configurations for different purposes.</p>
+
                     <h6>Column Selection</h6>
                     <p>Select the columns you want to include in your CSV export.</p>
 
@@ -206,14 +345,6 @@
                     </ul>
 
                     <h6>Delimiter Options</h6>
-                    <p>The column delimiter determines how values are separated in the CSV file:</p>
-                    <ul>
-                        <li>Comma: Standard for CSV files</li>
-                        <li>Semicolon: Used in regions where comma is a decimal separator</li>
-                        <li>Tab: Better for data with commas in values</li>
-                        <li>Pipe: Alternative separator for complex data</li>
-                    </ul>
-                    <h6>Export Options</h6>
                     <p>The column delimiter determines how values are separated in the CSV file:</p>
                     <ul>
                         <li>Comma: Standard for CSV files</li>
@@ -418,39 +549,68 @@
                 $('#customSeparatorContainer').show();
             }
 
+            // Handle Save Configuration button click
+            $('#saveConfigBtn').click(function(e) {
+                e.preventDefault();
+
+                // Make sure a configuration name is provided
+                if (!$('#ConfigName').val().trim()) {
+                    alert('Please enter a configuration name');
+                    $('#ConfigName').focus();
+                    return;
+                }
+
+                // Clone the form and change the action
+                var $form = $('#exportForm').clone();
+                $form.attr('action', '@Url.Action("SaveExportSettings", "Donations")');
+                $form.appendTo('body');
+                
+                // Submit the cloned form
+                $form.submit();
+                $form.remove();
+            });
+
+            // Handle Load Configuration button click
+            $('#loadConfigBtn').click(function() {
+                var configId = $('#configSelector').val();
+                if (configId) {
+                    window.location.href = '@Url.Action("Export", "Donations")' + '?configId=' + configId;
+                }
+            });
+
             // Form validation for export
             $('#exportForm').submit(function(e) {
-            // Check if at least one column or empty column is selected
-            if ($('#sortableColumns li').length === 0) {
-                e.preventDefault();
-                alert('Please select at least one column to export or add an empty column');
-                return false;
-            }
-
-            // Validate date range
-            const startDate = $('#StartDate').val();
-            const endDate = $('#EndDate').val();
-
-            if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-                e.preventDefault();
-                alert('Start date cannot be later than end date');
-                return false;
-            }
-
-            // Validate custom separator if it's selected
-            if ($('#delimiterSelector').val() === 'custom') {
-                const customSeparator = $('#CustomSeparator').val();
-                if (!customSeparator) {
+                // Check if at least one column or empty column is selected
+                if ($('#sortableColumns li').length === 0) {
                     e.preventDefault();
-                    alert('Please enter a custom separator');
-                    $('#CustomSeparator').focus();
+                    alert('Please select at least one column to export or add an empty column');
                     return false;
                 }
-            }
 
-            // If all validations pass, return true to submit the form
-            return true;
-        });
+                // Validate date range
+                const startDate = $('#StartDate').val();
+                const endDate = $('#EndDate').val();
+
+                if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+                    e.preventDefault();
+                    alert('Start date cannot be later than end date');
+                    return false;
+                }
+
+                // Validate custom separator if it's selected
+                if ($('select[name="Delimiter"]').val() === 'custom') {
+                    const customSeparator = $('#CustomSeparator').val();
+                    if (!customSeparator) {
+                        e.preventDefault();
+                        alert('Please enter a custom separator');
+                        $('#CustomSeparator').focus();
+                        return false;
+                    }
+                }
+
+                // If all validations pass, return true to submit the form
+                return true;
+            });
         });
     </script>
 }

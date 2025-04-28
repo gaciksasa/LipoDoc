@@ -59,9 +59,15 @@
                     </div>
 
                     <!-- Export donations-->
-                    <a asp-action="Export" class="btn btn-success me-3">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
-                    </a>
+                    <div class="dropdown d-inline-block me-3">
+                        <button class="btn btn-success dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> Export
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                            <li><a class="dropdown-item" asp-action="Export"><i class="bi bi-download"></i> Export to CSV</a></li>
+                            <li><a class="dropdown-item" asp-action="ExportSettings"><i class="bi bi-gear"></i> Manage Export Settings</a></li>
+                        </ul>
+                    </div>
 
                     <!-- Today Only toggle -->
                     <div class="form-check form-switch d-flex align-items-center">

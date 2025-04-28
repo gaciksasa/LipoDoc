@@ -74,6 +74,13 @@ namespace DeviceDataCollector.Models
             new SelectListItem { Value = "hh:mm:ss tt", Text = "hh:mm:ss AM/PM (12-hour)" },
             new SelectListItem { Value = "HH:mm", Text = "HH:mm (24-hour)" }
         };
+
+        public List<SelectListItem> SavedConfigurations { get; set; } = new List<SelectListItem>();
+        public int? SelectedConfigId { get; set; }
+        public string ConfigName { get; set; }
+        public string ConfigDescription { get; set; }
+        public bool SaveAsNew { get; set; }
+        public bool SetAsDefault { get; set; }
     }
 
     public class ColumnSelectionItem

@@ -253,7 +253,7 @@ namespace DeviceDataCollector.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Export()
+        public async Task<IActionResult> Export(int? configId)
         {
             // Create a view model with all available columns
             var model = new ExportViewModel
@@ -279,11 +279,97 @@ namespace DeviceDataCollector.Controllers
                 EmptyColumnsCount = 0
             };
 
-            // Initialize ColumnOrder with default selected columns
-            model.ColumnOrder = model.AvailableColumns
-                .Where(c => c.Selected)
-                .Select(c => c.Id)
-                .ToList();
+            // Get all saved configurations
+            var configurations = await _context.ExportSettingsConfigs
+                .OrderByDescending(c => c.IsDefault)
+                .ThenByDescending(c => c.LastUsedAt)
+                .ToListAsync();
+
+            // Build the dropdown for saved configurations
+            var configItems = configurations.Select(c => new SelectListItem
+            {
+                Value = c.Id.ToString(),
+                Text = c.Name + (c.IsDefault ? " (Default)" : ""),
+                Selected = configId.HasValue && c.Id == configId
+            }).ToList();
+
+            // Add a default option
+            configItems.Insert(0, new SelectListItem { Value = "", Text = "-- Select Configuration --" });
+
+            model.SavedConfigurations = configItems;
+
+            // If a specific config was requested
+            if (configId.HasValue)
+            {
+                var config = configurations.FirstOrDefault(c => c.Id == configId);
+                if (config != null)
+                {
+                    // Populate the model from the saved configuration
+                    model.SelectedConfigId = config.Id;
+                    model.ConfigName = config.Name;
+                    model.ConfigDescription = config.Description;
+                    model.Delimiter = config.Delimiter;
+                    model.CustomSeparator = config.CustomSeparator;
+                    model.DateFormat = config.DateFormat;
+                    model.TimeFormat = config.TimeFormat;
+                    model.IncludeHeaders = config.IncludeHeaders;
+                    model.EmptyColumnsCount = config.EmptyColumnsCount;
+
+                    // Deserialize saved columns and order
+                    if (!string.IsNullOrEmpty(config.SelectedColumnsJson))
+                    {
+                        try
+                        {
+                            model.SelectedColumns = System.Text.Json.JsonSerializer.Deserialize<List<string>>(config.SelectedColumnsJson) ?? new List<string>();
+
+                            // Update the "Selected" property of AvailableColumns
+                            foreach (var column in model.AvailableColumns)
+                            {
+                                column.Selected = model.SelectedColumns.Contains(column.Id);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error deserializing SelectedColumnsJson");
+                            model.SelectedColumns = new List<string>();
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(config.ColumnOrderJson))
+                    {
+                        try
+                        {
+                            model.ColumnOrder = System.Text.Json.JsonSerializer.Deserialize<List<string>>(config.ColumnOrderJson) ?? new List<string>();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error deserializing ColumnOrderJson");
+                            model.ColumnOrder = new List<string>();
+                        }
+                    }
+
+                    // Update LastUsedAt
+                    config.LastUsedAt = DateTime.Now;
+                    await _context.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                // If no specific config, try to load the default one
+                var defaultConfig = configurations.FirstOrDefault(c => c.IsDefault);
+                if (defaultConfig != null)
+                {
+                    return RedirectToAction(nameof(Export), new { configId = defaultConfig.Id });
+                }
+                else
+                {
+                    // Initialize ColumnOrder with default selected columns
+                    model.ColumnOrder = model.AvailableColumns
+                        .Where(c => c.Selected)
+                        .Select(c => c.Id)
+                        .ToList();
+                }
+            }
 
             try
             {
@@ -481,22 +567,202 @@ namespace DeviceDataCollector.Controllers
 
         private string GetPropertyValue(DonationsData donation, string propertyName, string dateFormat, string timeFormat)
         {
-            return propertyName switch
+            try
             {
-                "DonationIdBarcode" => donation.DonationIdBarcode ?? string.Empty,
-                "DeviceId" => donation.DeviceId ?? string.Empty,
-                "Timestamp" => donation.Timestamp.ToString($"{dateFormat} {timeFormat}"),
-                "LipemicValue" => donation.LipemicValue?.ToString() ?? string.Empty,
-                "LipemicGroup" => donation.LipemicGroup ?? string.Empty,
-                "LipemicStatus" => donation.LipemicStatus ?? string.Empty,
-                "RefCode" => donation.RefCode ?? string.Empty,
-                "OperatorIdBarcode" => donation.OperatorIdBarcode ?? string.Empty,
-                "LotNumber" => donation.LotNumber ?? string.Empty,
-                "MessageType" => donation.MessageType ?? string.Empty,
-                "IPAddress" => donation.IPAddress ?? string.Empty,
-                "Port" => donation.Port.ToString(),
-                _ => string.Empty
-            };
+                return propertyName switch
+                {
+                    "DonationIdBarcode" => donation.DonationIdBarcode ?? string.Empty,
+                    "DeviceId" => donation.DeviceId ?? string.Empty,
+                    "Timestamp" => donation.Timestamp.ToString($"{dateFormat} {timeFormat}"),
+                    "LipemicValue" => donation.LipemicValue?.ToString() ?? string.Empty,
+                    "LipemicGroup" => donation.LipemicGroup ?? string.Empty,
+                    "LipemicStatus" => donation.LipemicStatus ?? string.Empty,
+                    "RefCode" => donation.RefCode ?? string.Empty,
+                    "OperatorIdBarcode" => donation.OperatorIdBarcode ?? string.Empty,
+                    "LotNumber" => donation.LotNumber ?? string.Empty,
+                    "MessageType" => donation.MessageType ?? string.Empty,
+                    "IPAddress" => donation.IPAddress ?? string.Empty,
+                    "Port" => donation.Port.ToString(),
+                    _ => string.Empty
+                };
+            }
+            catch
+            {
+                // If there's any error in conversion, return empty string
+                return string.Empty;
+            }
+        }
+
+        // GET: Donations/ExportSettings
+        public async Task<IActionResult> ExportSettings()
+        {
+            // Get all saved configurations
+            var configurations = await _context.ExportSettingsConfigs
+                .OrderByDescending(c => c.IsDefault)
+                .ThenByDescending(c => c.LastUsedAt)
+                .ToListAsync();
+
+            return View(configurations);
+        }
+
+        // POST: Donations/SaveExportSettings
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveExportSettings(ExportViewModel model)
+        {
+            if (string.IsNullOrEmpty(model.ConfigName))
+            {
+                TempData["ErrorMessage"] = "Configuration name is required";
+                return RedirectToAction(nameof(Export));
+            }
+
+            try
+            {
+                ExportSettingsConfig config;
+
+                // Determine if we're updating or creating a new config
+                if (model.SaveAsNew || model.SelectedConfigId == null)
+                {
+                    // Create new configuration
+                    config = new ExportSettingsConfig
+                    {
+                        Name = model.ConfigName,
+                        Description = model.ConfigDescription,
+                        CreatedAt = DateTime.Now,
+                        CreatedBy = User.Identity?.Name
+                    };
+
+                    _context.ExportSettingsConfigs.Add(config);
+                }
+                else
+                {
+                    // Update existing configuration
+                    config = await _context.ExportSettingsConfigs.FindAsync(model.SelectedConfigId);
+
+                    if (config == null)
+                    {
+                        TempData["ErrorMessage"] = "Export configuration not found";
+                        return RedirectToAction(nameof(Export));
+                    }
+
+                    config.Name = model.ConfigName;
+                    config.Description = model.ConfigDescription;
+                }
+
+                // Save common properties
+                config.LastUsedAt = DateTime.Now;
+                config.SelectedColumnsJson = System.Text.Json.JsonSerializer.Serialize(model.SelectedColumns);
+                config.ColumnOrderJson = System.Text.Json.JsonSerializer.Serialize(model.ColumnOrder);
+                config.EmptyColumnsCount = model.EmptyColumnsCount;
+                config.Delimiter = model.Delimiter;
+                config.CustomSeparator = model.CustomSeparator;
+                config.DateFormat = model.DateFormat;
+                config.TimeFormat = model.TimeFormat;
+                config.IncludeHeaders = model.IncludeHeaders;
+
+                // Handle default setting
+                if (model.SetAsDefault)
+                {
+                    // First, remove default flag from all other configurations
+                    var allConfigs = await _context.ExportSettingsConfigs.ToListAsync();
+                    foreach (var c in allConfigs)
+                    {
+                        c.IsDefault = false;
+                    }
+
+                    // Set this one as default
+                    config.IsDefault = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                TempData["SuccessMessage"] = $"Export configuration '{config.Name}' saved successfully";
+                return RedirectToAction(nameof(Export), new { configId = config.Id });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving export configuration");
+                TempData["ErrorMessage"] = $"Error saving configuration: {ex.Message}";
+                return RedirectToAction(nameof(Export));
+            }
+        }
+
+        // POST: Donations/DeleteExportSettings
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteExportSettings(int id)
+        {
+            var config = await _context.ExportSettingsConfigs.FindAsync(id);
+            if (config == null)
+            {
+                TempData["ErrorMessage"] = "Export configuration not found";
+                return RedirectToAction(nameof(ExportSettings));
+            }
+
+            try
+            {
+                _context.ExportSettingsConfigs.Remove(config);
+                await _context.SaveChangesAsync();
+
+                // If we deleted the default config, set another one as default
+                if (config.IsDefault)
+                {
+                    var newDefault = await _context.ExportSettingsConfigs
+                        .OrderByDescending(c => c.LastUsedAt)
+                        .FirstOrDefaultAsync();
+
+                    if (newDefault != null)
+                    {
+                        newDefault.IsDefault = true;
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                TempData["SuccessMessage"] = $"Export configuration '{config.Name}' deleted successfully";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting export configuration: {ex.Message}");
+                TempData["ErrorMessage"] = $"Error deleting configuration: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(ExportSettings));
+        }
+
+        // POST: Donations/SetDefaultExportSettings
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetDefaultExportSettings(int id)
+        {
+            try
+            {
+                // First, remove default flag from all configurations
+                var allConfigs = await _context.ExportSettingsConfigs.ToListAsync();
+                foreach (var config in allConfigs)
+                {
+                    config.IsDefault = false;
+                }
+
+                // Set the selected one as default
+                var defaultConfig = await _context.ExportSettingsConfigs.FindAsync(id);
+                if (defaultConfig == null)
+                {
+                    TempData["ErrorMessage"] = "Export configuration not found";
+                    return RedirectToAction(nameof(ExportSettings));
+                }
+
+                defaultConfig.IsDefault = true;
+                await _context.SaveChangesAsync();
+
+                TempData["SuccessMessage"] = $"'{defaultConfig.Name}' set as default export configuration";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error setting default export configuration");
+                TempData["ErrorMessage"] = $"Error setting default configuration: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(ExportSettings));
         }
     }
 }

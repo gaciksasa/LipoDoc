@@ -17,6 +17,7 @@ namespace DeviceDataCollector.Data
         public DbSet<User> Users { get; set; }
         public DbSet<SystemNotification> SystemNotifications { get; set; }
         public DbSet<DeviceSetup> DeviceSetups { get; set; }
+        public DbSet<ExportSettingsConfig> ExportSettingsConfigs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
