@@ -42,7 +42,10 @@ namespace DeviceDataCollector.Models
         // Checksum
         public string? CheckSum { get; set; }
 
+        // Export tracking
+        public bool Exported { get; set; } = false;
+
         [NotMapped]
-        public bool IsLipemic => LipemicStatus == "LIPEMIC";
+        public bool IsLipemic => LipemicStatus == "LIPEMIC";       
     }
 }
