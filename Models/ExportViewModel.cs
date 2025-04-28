@@ -79,8 +79,8 @@ namespace DeviceDataCollector.Models
         public int? SelectedConfigId { get; set; }
         public string ConfigName { get; set; }
         public string ConfigDescription { get; set; }
-        public bool SaveAsNew { get; set; }
-        public bool SetAsDefault { get; set; }
+        public bool SaveAsNew { get; set; } = true;
+        public bool SetAsDefault { get; set; } = true;
     }
 
     public class ColumnSelectionItem

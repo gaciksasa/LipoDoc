@@ -1,4 +1,5 @@
-﻿@model DeviceDataCollector.Models.ExportViewModel
+﻿```cshtml
+@model DeviceDataCollector.Models.ExportViewModel
 
 @{
     ViewData["Title"] = "Export Donations";
@@ -37,38 +38,82 @@
 
     <div class="row">
         <div class="col-lg-8">
-            <!-- Configuration Selection Card -->
+            <!-- Saved Configurations Table -->
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Export Configuration</h5>
+                    <h5 class="mb-0">Saved Export Configurations</h5>
                     <a asp-controller="Donations" asp-action="ExportSettings" class="btn btn-sm btn-outline-light">
                         <i class="bi bi-gear"></i> Manage Configurations
                     </a>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <label class="form-label">Load Configuration</label>
-                            <select id="configSelector" class="form-select">
-                                @foreach (var config in Model.SavedConfigurations)
-                                {
-                                    if (config.Selected)
-                                    {
-                                        <option value="@config.Value" selected>@config.Text</option>
-                                    }
-                                    else
-                                    {
-                                        <option value="@config.Value">@config.Text</option>
-                                    }
-                                }
-                            </select>
+                <div class="card-body p-0">
+                    @if (!Model.SavedConfigurations.Any() || Model.SavedConfigurations.Count <= 1)
+                    {
+                        <div class="alert alert-info m-3 mb-0">
+                            <i class="bi bi-info-circle me-2"></i> No saved export configurations found. Create a new one by configuring the settings below and clicking "Save Configuration".
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button id="loadConfigBtn" class="btn btn-primary w-100">
-                                <i class="bi bi-cloud-download"></i> Load Configuration
-                            </button>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 1; i < Model.SavedConfigurations.Count; i++)
+                                    {
+                                        var config = Model.SavedConfigurations[i];
+                                        var configValue = config.Value;
+                                        var configText = config.Text;
+                                        var isDefault = configText.Contains("(Default)");
+                                        var displayName = isDefault ? configText.Replace(" (Default)", "") : configText;
+                                        
+                                        <tr>
+                                            <td>@displayName</td>
+                                            <td>-</td>
+                                            <td>
+                                                @if (isDefault)
+                                                {
+                                                    <span class="badge bg-success">Default</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="@Url.Action("Export", "Donations", new { configId = configValue })" class="btn btn-sm btn-primary">
+                                                        <i class="bi bi-box-arrow-in-right"></i> Load
+                                                    </a>
+                                                    
+                                                    @if (!isDefault)
+                                                    {
+                                                        <form asp-action="SetDefaultExportSettings" asp-route-id="@configValue" method="post" style="display: inline;">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-sm btn-success">
+                                                                <i class="bi bi-star"></i> Set Default
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                    
+                                                    <form asp-action="DeleteExportSettings" asp-route-id="@configValue" method="post" 
+                                                          style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this configuration?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="btn btn-sm btn-danger">
+                                                            <i class="bi bi-trash"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
+                    }
                 </div>
             </div>
 
@@ -570,14 +615,6 @@
                 $form.remove();
             });
 
-            // Handle Load Configuration button click
-            $('#loadConfigBtn').click(function() {
-                var configId = $('#configSelector').val();
-                if (configId) {
-                    window.location.href = '@Url.Action("Export", "Donations")' + '?configId=' + configId;
-                }
-            });
-
             // Form validation for export
             $('#exportForm').submit(function(e) {
                 // Check if at least one column or empty column is selected
@@ -614,3 +651,4 @@
         });
     </script>
 }
+```
