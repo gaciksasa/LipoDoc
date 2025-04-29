@@ -1,271 +1,176 @@
-# IQ Link
+# IQ Link - Device Data Collection Platform
 
-A robust .NET 8 web application designed to collect, store, and manage data from blood lipemic testing devices over TCP/IP.
-
-## Overview
-
-IQ Link is a centralized system that provides:
-
-- Real-time data collection from blood lipemic testing devices
-- TCP/IP server for direct device communication
-- Secure data storage in a MySQL database
-- User-friendly web interface for monitoring and managing devices
-- Role-based access control for system security
-- Comprehensive donation data analytics and reporting
-
-This application serves as a hub for blood donation centers to monitor their testing devices, collect lipemic test results, and ensure data integrity across multiple locations.
+IQ Link is a centralized device management platform designed for collecting, monitoring, and analyzing data from devices connected via TCP/IP. It's particularly focused on managing devices that perform lipemic tests on blood donations.
 
 ## Features
 
-### Device Communication
-- TCP/IP server that listens for incoming connections from testing devices on port 5000
-- Support for proprietary LipoDoc device protocol
-- Automatic device registration and status tracking
-- Buffered data retrieval for devices with intermittent connectivity
-- Remote device configuration and serial number management
-- Time synchronization between server and devices
+### Dashboard
+- Real-time system status monitoring
+- Quick access to key metrics (donations, devices, users)
+- System uptime tracking
 
-### Data Management
-- Comprehensive blood donation lipemic test result storage
-- Real-time device status monitoring and tracking
-- Donation data filtering, sorting, and reporting
-- Database backup and restore capabilities
-- Historical data retention and automated cleanup
+### Device Management
+- Automatic registration of devices on first connection
+- Device activity monitoring
+- Device configuration and settings management
+- Serial number updates
+- Request and apply device setup changes
 
-### Web Interface
-- Real-time device monitoring dashboard with auto-refresh
-- Detailed donation data visualization with filtering and sorting
-- Device management and configuration
-- User-friendly responsive design using Bootstrap 5
-- Administrative tools for system maintenance
+### Donation Data Management
+- View and filter donation records
+- Real-time data updates
+- Advanced data export with customizable formats
+- Track lipemic test results (values, groups, status)
 
-### Security
-- Role-based authentication system (Admin/User roles)
-- Secure password storage with BCrypt hashing
-- Protected routes and views based on user permissions
-- Audit logging for sensitive operations
+### User Management
+- Role-based authentication (Admin/User roles)
+- User profile management
+- Secure password storage
 
-## System Architecture
+### System Settings
+- Network configuration
+- Database connection settings
+- Backup and restore functionality
 
-The application consists of:
+## Technical Details
 
-1. **Web Interface** - ASP.NET MVC with Bootstrap 5
-2. **TCP Server** - Background service for device communication
-3. **Database** - MySQL with Entity Framework Core
-4. **Background Services** - For monitoring, cleanup, and maintenance tasks
+### Network Communication
+- The application acts as a TCP server listening on port 5000
+- Devices connect to this port and exchange data using a proprietary protocol
+- No need to manually configure IP addresses of remote devices - they automatically connect to the server
 
-## Database Schema
-
-### DonationsData
-Stores the lipemic test results from blood donation devices:
-- ID (auto-generated primary key)
-- DeviceId (serial number of the device)
-- Timestamp (when data was received)
-- MessageType (the type of message: "#S", "#D", etc.)
-- RawPayload (the raw message content)
-- IP/Port information
-- Barcode data (donation ID, operator ID, ref code, lot number)
-- Lipemic test results (value, group, status)
-
-### DeviceStatus / CurrentDeviceStatus
-Stores the status updates from devices:
-- DeviceId (serial number of the device)
-- Timestamp (when status was received)
-- Status (0=IDLE, 1=Process in progress, 2=Process completed)
-- AvailableData (number of readings buffered in the device)
-- IP/Port information
-
-### Device
-Stores information about registered devices:
-- ID (auto-generated primary key)
-- SerialNumber (unique identifier for the device)
-- Name (friendly name for the device)
-- Location (location of the device)
-- LastConnectionTime (last time the device connected)
-- RegisteredDate (when the device was first registered)
-- IsActive (whether the device is active)
-- Notes (additional notes about the device)
-
-### Users
-Stores user authentication information:
-- ID (auto-generated primary key)
-- Username (unique username)
-- PasswordHash (BCrypt-hashed password)
-- Role (Admin or User)
-- FullName, Email, CreatedAt, LastLogin
-
-### SystemNotifications
-Stores system notifications for important events:
-- ID (auto-generated primary key)
-- Type (type of notification)
-- Message (notification content)
-- Timestamp (when the notification was created)
-- Read (whether the notification has been read)
-- RelatedEntityId (optional reference to related entity)
-
-## Device Communication Protocol
-
-The IQ Link communicates with devices using a proprietary protocol. Key message types include:
-
-### Status Messages (`#S`)
-```
-#SªSNªStatusª"timestamp"ª"AvailableData"ª"CS"ý
-```
-
-### Data Messages (`#D`)
-```
-#DªSNªtimestampªBªRefCodeªDonationIdªOperatorIdªLotNumberªMªLipemicValueªLipemicGroupªLipemicStatusªENDEªCSý
-```
-
-### Serial Number Update Messages (`#i`)
-```
-#iªoldSNªnewSNª"CS"ýLF
-```
-
-### Request Buffered Data Messages (`#u`)
-```
-#uªSNªLF
-```
-
-The application handles these messages and more, providing a robust communication layer between devices and the server.
+### Data Storage
+- Uses MySQL database for data persistence
+- Supports database backup and restore functionality
+- Automatic database migration on startup
 
 ## Getting Started
 
 ### Prerequisites
-
-- .NET 8.0 SDK
-- MySQL Server 8.0 or higher
-- Modern web browser
-- Network access to connect with devices
+- .NET 6.0 SDK or later
+- MySQL Server 5.7 or later
 
 ### Installation
 
-1. Clone the repository
-2. Update the database connection string in `appsettings.json`
-3. Run the database migrations:
+1. **Clone the repository:**
    ```
-   dotnet ef database update
+   git clone https://github.com/yourusername/DeviceDataCollector.git
+   cd DeviceDataCollector
    ```
-4. Start the application:
+
+2. **Update database connection string:**
+   - Open `appsettings.json`
+   - Modify the `ConnectionStrings:DefaultConnection` to match your MySQL server settings:
+     ```json
+     "ConnectionStrings": {
+       "DefaultConnection": "server=localhost;port=3306;database=devicedata;user=root;password=your_password"
+     }
+     ```
+
+3. **Build and run the application:**
    ```
+   dotnet build
    dotnet run
    ```
+   
+4. **Access the application:**
+   - Open a web browser and navigate to `http://localhost:5000`
+   - Default login credentials:
+     - Admin: Username: `admin`, Password: `admin123`
+     - User: Username: `user`, Password: `user123`
 
-The application will:
-- Initialize the database (create if it doesn't exist)
-- Apply any pending migrations
-- Start the TCP server for device communication
-- Launch the web interface
+### Configuring TCP Server
 
-### Default Credentials
-
-The system includes two predefined user accounts:
-
-1. **Administrator**
-   - Username: `admin`
-   - Password: `admin123`
-   - Full access to all features
-
-2. **Regular User**
-   - Username: `user`
-   - Password: `user123`
-   - Limited access (can view data but cannot modify system settings)
-
-## Configuration
-
-The main configuration is in `appsettings.json`:
+By default, the TCP server binds to the IP address specified in `appsettings.json` under `TCPServer:IPAddress` and listens on the port specified in `TCPServer:Port`. The default port is 5000.
 
 ```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "server=localhost;port=3306;database=devicedata;user=root;password=root"
-  },
-  "TCPServer": {
-    "IPAddress": "192.168.1.130",
-    "Port": 5000
-  },
-  "DeviceStatusMonitor": {
-    "CheckIntervalSeconds": 5,
-    "InactiveThresholdSeconds": 10
-  },
-  "DeviceStatusCleanup": {
-    "IntervalHours": 24,
-    "RetentionDays": 30
-  },
-  "DatabaseBackup": {
-    "Scheduled": {
-      "Enabled": false,
-      "Time": "08:00",
-      "RetentionCount": 7,
-      "IntervalHours": 24
-    }
-  }
+"TCPServer": {
+  "IPAddress": "192.168.1.130",
+  "Port": 5000
 }
 ```
 
-Key settings:
-- **DefaultConnection**: Your MySQL connection string
-- **TCPServer:IPAddress**: The IP address to listen on for device connections
-- **TCPServer:Port**: The port to listen on for device connections (default: 5000)
-- **DeviceStatusMonitor**: Configuration for device status checking frequency
-- **DeviceStatusCleanup**: Configuration for automatic data cleanup
-- **DatabaseBackup**: Configuration for automated database backups
+Make sure to set the IP address to one of your machine's network interfaces that the devices can reach.
 
-## Key Features In Detail
+## Working with Devices
+
+### Device Protocol
+
+The application communicates with devices using a specialized protocol:
+
+1. Devices send status updates (`#S` messages)
+2. Devices send data readings (`#D` messages)
+3. Server can request buffered data (`#u` messages)
+4. Server can update device configuration (`#W` messages)
+5. Server can update device serial numbers (`#i` messages)
+
+### Device Setup Mode
+
+To configure a device:
+1. Put the device into setup mode (usually through device's interface)
+2. The device status will change to "Setup Mode" (Status = 3) in the system
+3. Click "Request Setup" button to retrieve current configuration
+4. Make desired changes and click "Save Setup" to apply them
+
+## User Guide
+
+### Viewing Donation Data
+
+1. Click on "Donations" in the sidebar
+2. Use filters and sorting options to find specific records
+3. Click on "Details" for more information about a specific donation
+
+### Exporting Data
+
+1. Navigate to Donations → Export
+2. Select desired columns and configure export format
+3. Set date range and device filters
+4. Click "Export to CSV"
+5. Save your export configuration for future use
 
 ### Device Management
 
-- Automatic device registration from incoming connections
-- Real-time device status monitoring
-- Remote serial number updates
-- Device activity tracking and alerts
+1. Click on "Devices" in the sidebar
+2. View all registered devices and their current status
+3. Click on a device to view details and recent readings
+4. Use the Edit option to update device information
 
-### Donation Data Collection
+### System Administration (Admin Only)
 
-- Automatic parsing of device messages into structured data
-- Support for multiple message formats
-- Barcode scanning integration
-- Lipemic value tracking and classification
+1. **User Management:**
+   - Create, edit, or delete user accounts
+   - Assign Admin or User roles
 
-### Backup and Recovery
+2. **Network Settings:**
+   - Configure TCP server settings
+   - View available network interfaces
 
-- Manual and scheduled database backups
-- Backup compression and management
-- Database restoration capabilities
-- Configurable retention policies
+3. **Database Settings:**
+   - Configure database connection
+   - Test database connectivity
 
-### Administrative Tools
-
-- User management
-- Network configuration
-- Database management
-- System monitoring
-
-## Extending the Application
-
-### Adding New Device Types
-
-To add support for new device types:
-
-1. Update the `DeviceMessageParser` class to handle new message formats
-2. Add any new fields to the data models if needed
-3. Create migrations to update the database schema
+4. **Backup and Restore:**
+   - Create manual or scheduled backups
+   - Restore from previous backups
 
 ## Troubleshooting
 
-### Common Issues
+### Device Connection Issues
 
-1. **Database Connection Errors**
-   - Verify your MySQL connection string
-   - Ensure MySQL is running
-   - Check user permissions
+- Ensure the TCP server IP address is correctly set to your machine's IP
+- Verify port 5000 is not blocked by a firewall
+- Check that devices are configured to connect to the correct server IP and port
 
-2. **TCP Server Not Starting**
-   - Verify the IP address is available on your system
-   - Check if the port is already in use
-   - Look for firewall restrictions
+### Database Issues
 
-3. **Devices Not Connecting**
-   - Verify device is configured with correct server IP and port
-   - Check network connectivity between device and server
-   - Review server logs for connection attempts
+- Verify MySQL server is running
+- Check database connection string in appsettings.json
+- Ensure the specified database exists or the user has permission to create it
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support and further information, please contact the development team.
