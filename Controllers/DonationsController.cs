@@ -596,13 +596,8 @@ namespace DeviceDataCollector.Controllers
         // GET: Donations/ExportSettings
         public async Task<IActionResult> ExportSettings()
         {
-            // Get all saved configurations
-            var configurations = await _context.ExportSettingsConfigs
-                .OrderByDescending(c => c.IsDefault)
-                .ThenByDescending(c => c.LastUsedAt)
-                .ToListAsync();
-
-            return View(configurations);
+            // Redirect to Export action to consolidate functionality
+            return RedirectToAction(nameof(Export));
         }
 
         // POST: Donations/SaveExportSettings
@@ -687,7 +682,7 @@ namespace DeviceDataCollector.Controllers
             }
         }
 
-        // POST: Donations/DeleteExportSettings
+        // Modified DeleteExportSettings action to return to Export view
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteExportSettings(int id)
@@ -696,7 +691,7 @@ namespace DeviceDataCollector.Controllers
             if (config == null)
             {
                 TempData["ErrorMessage"] = "Export configuration not found";
-                return RedirectToAction(nameof(ExportSettings));
+                return RedirectToAction(nameof(Export));
             }
 
             try
@@ -726,10 +721,11 @@ namespace DeviceDataCollector.Controllers
                 TempData["ErrorMessage"] = $"Error deleting configuration: {ex.Message}";
             }
 
-            return RedirectToAction(nameof(ExportSettings));
+            // Return to Export view instead of ExportSettings
+            return RedirectToAction(nameof(Export));
         }
 
-        // POST: Donations/SetDefaultExportSettings
+        // Modified SetDefaultExportSettings action to return to Export view
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SetDefaultExportSettings(int id)
@@ -748,7 +744,7 @@ namespace DeviceDataCollector.Controllers
                 if (defaultConfig == null)
                 {
                     TempData["ErrorMessage"] = "Export configuration not found";
-                    return RedirectToAction(nameof(ExportSettings));
+                    return RedirectToAction(nameof(Export));
                 }
 
                 defaultConfig.IsDefault = true;
@@ -762,7 +758,8 @@ namespace DeviceDataCollector.Controllers
                 TempData["ErrorMessage"] = $"Error setting default configuration: {ex.Message}";
             }
 
-            return RedirectToAction(nameof(ExportSettings));
+            // Return to Export view instead of ExportSettings
+            return RedirectToAction(nameof(Export));
         }
     }
 }
