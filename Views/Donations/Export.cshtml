@@ -651,14 +651,80 @@
                     return;
                 }
 
-                // Clone the form and change the action
-                var $form = $('#exportForm').clone();
+                // Create a new form
+                var $form = $('<form>');
                 $form.attr('action', '@Url.Action("SaveExportSettings", "Donations")');
+                $form.attr('method', 'post');
+
+                // Add anti-forgery token
+                var token = $('input[name="__RequestVerificationToken"]').val();
+                $form.append($('<input type="hidden" name="__RequestVerificationToken">').val(token));
+
+                // Copy all input values from the original form
+                $('#exportForm').find('input, select, textarea').each(function() {
+                    var input = $(this);
+                    var name = input.attr('name');
+                    var value = input.val();
+
+                    if (name) {
+                        // Skip anti-forgery token as we've already added it
+                        if (name === '__RequestVerificationToken') {
+                            return;
+                        }
+
+                        // Skip ColumnOrder as we'll handle it separately
+                        if (name === 'ColumnOrder') {
+                            return;
+                        }
+
+                        // For checkboxes, handle special case
+                        if (input.attr('type') === 'checkbox') {
+                            if (input.is(':checked')) {
+                                $form.append($('<input type="hidden">').attr('name', name).val('true'));
+                            } else {
+                                $form.append($('<input type="hidden">').attr('name', name).val('false'));
+                            }
+                        }
+                        // For multi-select elements
+                        else if (input.prop('multiple') && input.prop('selectedOptions')) {
+                            var options = input.prop('selectedOptions');
+                            for (var i = 0; i < options.length; i++) {
+                                $form.append($('<input type="hidden">').attr('name', name).val(options[i].value));
+                            }
+                        }
+                        // For regular inputs
+                        else {
+                            $form.append($('<input type="hidden">').attr('name', name).val(value));
+                        }
+                    }
+                });
+
+                // Get column order directly from list items instead of hidden inputs
+                // This avoids duplicate entries in the ColumnOrderJson
+                $('#sortableColumns li').each(function() {
+                    var columnId = $(this).data('column-id');
+                    $form.append($('<input type="hidden" name="ColumnOrder">').val(columnId));
+                });
+
+                // Special handling for selected columns
+                $('.column-checkbox:checked').each(function() {
+                    var value = $(this).val();
+                    $form.append($('<input type="hidden" name="SelectedColumns">').val(value));
+                });
+
+                // Make sure to add SaveAsNew and SetAsDefault values
+                $form.append($('<input type="hidden" name="SaveAsNew">').val($('#saveAsNewCheckbox').is(':checked')));
+                $form.append($('<input type="hidden" name="SetAsDefault">').val($('#setAsDefaultCheckbox').is(':checked')));
+
+                // Add the form to the DOM
+                $form.css('display', 'none');
                 $form.appendTo('body');
 
-                // Submit the cloned form
+                // Submit the form and then remove it
                 $form.submit();
-                $form.remove();
+                setTimeout(function() {
+                    $form.remove();
+                }, 1000);
             });
 
             // Handle the Load Config button

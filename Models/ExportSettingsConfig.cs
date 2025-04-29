@@ -32,7 +32,7 @@ namespace DeviceDataCollector.Models
         public string? CustomSeparator { get; set; }
 
         // Date and time formats
-        public string? DateFormat { get; set; } = "yyyy-MM-dd";
+        public string? DateFormat { get; set; } = "dd.MM.yyyy";
         public string? TimeFormat { get; set; } = "HH:mm:ss";
 
         // Include headers in export
@@ -40,5 +40,10 @@ namespace DeviceDataCollector.Models
 
         // Created by user
         public string? CreatedBy { get; set; }
+
+        // Filter options
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public string? DeviceId { get; set; }
     }
 }

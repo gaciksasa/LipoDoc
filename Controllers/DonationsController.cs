@@ -315,6 +315,11 @@ namespace DeviceDataCollector.Controllers
                     model.IncludeHeaders = config.IncludeHeaders;
                     model.EmptyColumnsCount = config.EmptyColumnsCount;
 
+                    // Load filter options
+                    model.StartDate = config.StartDate;
+                    model.EndDate = config.EndDate;
+                    model.DeviceId = config.DeviceId;
+
                     // Deserialize saved columns and order
                     if (!string.IsNullOrEmpty(config.SelectedColumnsJson))
                     {
@@ -654,6 +659,11 @@ namespace DeviceDataCollector.Controllers
                 config.DateFormat = model.DateFormat;
                 config.TimeFormat = model.TimeFormat;
                 config.IncludeHeaders = model.IncludeHeaders;
+
+                // Save filter options
+                config.StartDate = model.StartDate;
+                config.EndDate = model.EndDate;
+                config.DeviceId = model.DeviceId;
 
                 // Handle default setting
                 if (model.SetAsDefault)
