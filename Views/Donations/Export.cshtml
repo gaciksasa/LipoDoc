@@ -247,6 +247,18 @@
                             </div>
                         </div>
                         <div class="row mb-4">
+                            <div class="col-md-12 mb-3">
+                                <label asp-for="ExportFolderPath" class="form-label">Export Folder</label>
+                                <div class="input-group">
+                                    <input type="text" asp-for="ExportFolderPath" class="form-control" placeholder="C:\Exports">
+                                    <button class="btn btn-outline-secondary" type="button" id="selectFolderBtn">
+                                        <i class="bi bi-folder2-open"></i> Browse
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">Enter the path where files will be saved.</small>
+                            </div>
+                        </div>
+                        <div class="row mb-4">
                             <div class="col-md-4 mb-3">
                                 <label asp-for="DateFormat" class="form-label">Date Format</label>
                                 <select asp-for="DateFormat" asp-items="Model.DateFormatOptions" class="form-select">
@@ -732,6 +744,14 @@
                 const configId = $('#configSelect').val();
                 if (configId) {
                     window.location.href = '@Url.Action("Export", "Donations")?configId=' + configId;
+                }
+            });
+
+            // Export folder path
+            $('#selectFolderBtn').click(function() {
+                const path = prompt("Enter the folder path where CSV files will be saved:", $('#ExportFolderPath').val() || "C:\\Exports");
+                if (path) {
+                    $('#ExportFolderPath').val(path);
                 }
             });
 

@@ -50,7 +50,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("DeviceId");
 
-                    b.ToTable("CurrentDeviceStatuses");
+                    b.ToTable("CurrentDeviceStatuses", (string)null);
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.Device", b =>
@@ -85,7 +85,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Devices");
+                    b.ToTable("Devices", (string)null);
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.DeviceSetup", b =>
@@ -168,7 +168,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DeviceSetups");
+                    b.ToTable("DeviceSetups", (string)null);
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.DeviceStatus", b =>
@@ -213,7 +213,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.ToTable("DeviceStatuses");
+                    b.ToTable("DeviceStatuses", (string)null);
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.DonationsData", b =>
@@ -288,7 +288,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.ToTable("DonationsData");
+                    b.ToTable("DonationsData", (string)null);
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.SystemNotification", b =>
@@ -318,7 +318,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SystemNotifications");
+                    b.ToTable("SystemNotifications", (string)null);
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.User", b =>
@@ -356,7 +356,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
 
                     b.HasData(
                         new

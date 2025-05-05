@@ -314,6 +314,7 @@ namespace DeviceDataCollector.Controllers
                     model.TimeFormat = config.TimeFormat;
                     model.IncludeHeaders = config.IncludeHeaders;
                     model.EmptyColumnsCount = config.EmptyColumnsCount;
+                    model.ExportFolderPath = config.ExportFolderPath;
 
                     // Load filter options
                     model.StartDate = config.StartDate;
@@ -545,9 +546,44 @@ namespace DeviceDataCollector.Controllers
             // Generate file name
             string fileName = $"Donations_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
-            // Return CSV file
-            byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
-            return File(bytes, "text/csv", fileName);
+            // Check if a folder path was provided
+            string fullPath;
+            if (!string.IsNullOrEmpty(model.ExportFolderPath))
+            {
+                try
+                {
+                    // Ensure the folder exists
+                    string folderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), model.ExportFolderPath);
+                    Directory.CreateDirectory(folderPath);
+
+                    // Create the full file path
+                    fullPath = Path.Combine(folderPath, fileName);
+
+                    // Write the CSV to the file
+                    await System.IO.File.WriteAllTextAsync(fullPath, csv.ToString());
+
+                    // Set success message
+                    TempData["SuccessMessage"] = $"File exported successfully to {fullPath}";
+
+                    // Return to the export page
+                    return RedirectToAction(nameof(Export), new { configId = model.SelectedConfigId });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error saving file to folder: {ex.Message}");
+                    TempData["ErrorMessage"] = $"Error saving file: {ex.Message}. Falling back to browser download.";
+
+                    // Fallback to browser download
+                    byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                    return File(bytes, "text/csv", fileName);
+                }
+            }
+            else
+            {
+                // No folder path provided, use browser download
+                byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                return File(bytes, "text/csv", fileName);
+            }
         }
 
         private string GetColumnDisplayName(string columnId)
@@ -659,6 +695,7 @@ namespace DeviceDataCollector.Controllers
                 config.DateFormat = model.DateFormat;
                 config.TimeFormat = model.TimeFormat;
                 config.IncludeHeaders = model.IncludeHeaders;
+                config.ExportFolderPath = model.ExportFolderPath; // Save the export folder path
 
                 // Save filter options
                 config.StartDate = model.StartDate;

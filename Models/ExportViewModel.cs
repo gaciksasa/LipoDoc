@@ -49,6 +49,9 @@ namespace DeviceDataCollector.Models
         [Display(Name = "Custom Separator")]
         public string CustomSeparator { get; set; } = "";
 
+        [Display(Name = "Export Folder")]
+        public string ExportFolderPath { get; set; } = string.Empty;
+
         // Delimiters to choose from
         public List<SelectListItem> DelimiterOptions => new List<SelectListItem>
         {
