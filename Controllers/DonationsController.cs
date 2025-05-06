@@ -21,14 +21,6 @@ namespace DeviceDataCollector.Controllers
         private readonly ILogger<DonationsController> _logger;
         private readonly int _pageSize = 20; // Default page size
 
-        public DonationsController(
-            ApplicationDbContext context,
-            ILogger<DonationsController> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
-
         // GET: Donations
         public async Task<IActionResult> Index(string sortOrder, string currentFilter, string searchString, int? pageNumber, bool? todayOnly = null)
         {
