@@ -50,7 +50,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("DeviceId");
 
-                    b.ToTable("CurrentDeviceStatuses", (string)null);
+                    b.ToTable("CurrentDeviceStatuses");
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.Device", b =>
@@ -85,7 +85,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Devices", (string)null);
+                    b.ToTable("Devices");
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.DeviceSetup", b =>
@@ -168,7 +168,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DeviceSetups", (string)null);
+                    b.ToTable("DeviceSetups");
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.DeviceStatus", b =>
@@ -213,7 +213,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.ToTable("DeviceStatuses", (string)null);
+                    b.ToTable("DeviceStatuses");
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.DonationsData", b =>
@@ -288,7 +288,85 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasIndex("Timestamp");
 
-                    b.ToTable("DonationsData", (string)null);
+                    b.ToTable("DonationsData");
+                });
+
+            modelBuilder.Entity("DeviceDataCollector.Models.ExportSettingsConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AutoExportEnabled")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("AutoExportMode")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ColumnOrderJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("CustomFileName")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("CustomSeparator")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DateFormat")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Delimiter")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DeviceId")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("EmptyColumnsCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ExportFolderPath")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IncludeHeaders")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("SelectedColumnsJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("TimeFormat")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ExportSettingsConfigs");
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.SystemNotification", b =>
@@ -318,7 +396,7 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SystemNotifications", (string)null);
+                    b.ToTable("SystemNotifications");
                 });
 
             modelBuilder.Entity("DeviceDataCollector.Models.User", b =>
@@ -356,26 +434,26 @@ namespace DeviceDataCollector.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
 
                     b.HasData(
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2025, 4, 28, 9, 50, 17, 672, DateTimeKind.Local).AddTicks(948),
+                            CreatedAt = new DateTime(2025, 5, 6, 12, 24, 0, 785, DateTimeKind.Local).AddTicks(6813),
                             Email = "admin@blooddonation.org",
                             FullName = "Administrator",
-                            PasswordHash = "$2a$11$.OlMbeYO784ErRx0tvC7D.7e6BuUIgBsHw/Bgh9hrl9sPs3oNxG22",
+                            PasswordHash = "$2a$11$VQVQJaK3AOAncmlO1Uk4KeU9yElte4qigsWvutw1Adb.zENCfDs1W",
                             Role = "Admin",
                             Username = "admin"
                         },
                         new
                         {
                             Id = 2,
-                            CreatedAt = new DateTime(2025, 4, 28, 9, 50, 17, 862, DateTimeKind.Local).AddTicks(4303),
+                            CreatedAt = new DateTime(2025, 5, 6, 12, 24, 0, 978, DateTimeKind.Local).AddTicks(7338),
                             Email = "user@blooddonation.org",
                             FullName = "Regular User",
-                            PasswordHash = "$2a$11$823kzwuxyfRcurn2Ldow7uAj.oe2tIKgTq0w4/V0O37aTxHofe3X6",
+                            PasswordHash = "$2a$11$hbhu7JoKIlHHyAB1eMwAy.dtfmqMamMHq9JVar1p.6AsuqGVIIJyG",
                             Role = "User",
                             Username = "user"
                         });

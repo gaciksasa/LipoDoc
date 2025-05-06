@@ -315,6 +315,9 @@ namespace DeviceDataCollector.Controllers
                     model.IncludeHeaders = config.IncludeHeaders;
                     model.EmptyColumnsCount = config.EmptyColumnsCount;
                     model.ExportFolderPath = config.ExportFolderPath;
+                    model.AutoExportEnabled = config.AutoExportEnabled;
+                    model.AutoExportMode = config.AutoExportMode ?? "single_file";
+                    model.CustomFileName = config.CustomFileName ?? "Donations_Export";
 
                     // Load filter options
                     model.StartDate = config.StartDate;
@@ -695,7 +698,10 @@ namespace DeviceDataCollector.Controllers
                 config.DateFormat = model.DateFormat;
                 config.TimeFormat = model.TimeFormat;
                 config.IncludeHeaders = model.IncludeHeaders;
-                config.ExportFolderPath = model.ExportFolderPath; // Save the export folder path
+                config.ExportFolderPath = model.ExportFolderPath;
+                config.AutoExportEnabled = model.AutoExportEnabled;
+                config.AutoExportMode = model.AutoExportMode;
+                config.CustomFileName = model.CustomFileName;
 
                 // Save filter options
                 config.StartDate = model.StartDate;

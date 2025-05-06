@@ -48,5 +48,10 @@ namespace DeviceDataCollector.Models
 
         // Export folder path
         public string? ExportFolderPath { get; set; }
+
+        // Auto export settings
+        public bool AutoExportEnabled { get; set; } = false;
+        public string? AutoExportMode { get; set; } = "single_file";
+        public string? CustomFileName { get; set; } = "Donations_Export";
     }
 }

@@ -52,6 +52,15 @@ namespace DeviceDataCollector.Models
         [Display(Name = "Export Folder")]
         public string ExportFolderPath { get; set; } = string.Empty;
 
+        [Display(Name = "Auto Export Enabled")]
+        public bool AutoExportEnabled { get; set; } = false;
+
+        [Display(Name = "Auto Export Mode")]
+        public string AutoExportMode { get; set; } = "single_file"; // Options: single_file, daily_file, individual_files
+
+        [Display(Name = "Custom File Name")]
+        public string CustomFileName { get; set; } = "Donations_Export";
+
         // Delimiters to choose from
         public List<SelectListItem> DelimiterOptions => new List<SelectListItem>
         {

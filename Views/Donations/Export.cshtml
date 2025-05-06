@@ -259,6 +259,34 @@
                             </div>
                         </div>
 
+                        <hr class="my-4">
+
+                        <div class="row mb-4">
+                            <h6 class="mb-3">Auto Export Options:</h6>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check form-switch">
+                                    <input asp-for="AutoExportEnabled" class="form-check-input" type="checkbox" id="autoExportEnabledSwitch">
+                                    <label class="form-check-label" for="autoExportEnabledSwitch">Enable Auto Export</label>
+                                </div>
+                                <div class="text-muted small">Automatically export donations when they are received</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="AutoExportMode" class="form-label">Export Mode</label>
+                                <select asp-for="AutoExportMode" class="form-select" id="autoExportMode">
+                                    <option value="single_file">Single File (Append)</option>
+                                    <option value="daily_file">Daily Files</option>
+                                    <option value="individual_files">Individual Files (Per Donation)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="CustomFileName" class="form-label">Custom File Name</label>
+                                <input asp-for="CustomFileName" class="form-control" placeholder="Donations_Export">
+                                <div class="text-muted small">
+                                    <span id="filenameFormatInfo">Base name for export files</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Save Configuration Section -->
                         <div class="card mb-4">
                             <div class="card-header">
@@ -771,6 +799,48 @@
 
                 // If all validations pass, return true to submit the form
                 return true;
+            });
+
+            // Auto Export Mode related scripts
+            $('#autoExportMode').change(function() {
+                updateFilenameFormatInfo();
+            });
+
+            $('#autoExportEnabledSwitch').change(function() {
+                const isEnabled = $(this).is(':checked');
+                $('#autoExportMode').prop('disabled', !isEnabled);
+                $('#CustomFileName').prop('disabled', !isEnabled);
+            });
+
+            function updateFilenameFormatInfo() {
+                const mode = $('#autoExportMode').val();
+                const customName = $('#CustomFileName').val() || 'Donations_Export';
+
+                let formatInfo = '';
+                switch(mode) {
+                    case 'single_file':
+                        formatInfo = `Results in: ${customName}.csv`;
+                        break;
+                    case 'daily_file':
+                        const today = new Date();
+                        const dateStr = today.toISOString().split('T')[0].replace(/-/g, '_');
+                        formatInfo = `Results in: ${customName}_${dateStr}.csv`;
+                        break;
+                    case 'individual_files':
+                        formatInfo = `Results in: ${customName}_DonationID.csv`;
+                        break;
+                }
+
+                $('#filenameFormatInfo').text(formatInfo);
+            }
+
+            // Initialize the format info and disabled state
+            $(document).ready(function() {
+                updateFilenameFormatInfo();
+
+                const isEnabled = $('#autoExportEnabledSwitch').is(':checked');
+                $('#autoExportMode').prop('disabled', !isEnabled);
+                $('#CustomFileName').prop('disabled', !isEnabled);
             });
         });
     </script>
