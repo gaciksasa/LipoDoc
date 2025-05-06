@@ -287,6 +287,11 @@
                             </div>
                         </div>
 
+                        <div class="alert alert-info mt-3" id="autoExportStatus" style="display: none;">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <span id="autoExportStatusText">Auto-export is disabled. Enable it to automatically export new donations.</span>
+                        </div>
+
                         <!-- Save Configuration Section -->
                         <div class="card mb-4">
                             <div class="card-header">
@@ -841,6 +846,47 @@
                 const isEnabled = $('#autoExportEnabledSwitch').is(':checked');
                 $('#autoExportMode').prop('disabled', !isEnabled);
                 $('#CustomFileName').prop('disabled', !isEnabled);
+            });
+
+            function updateAutoExportStatus() {
+                const isEnabled = $('#autoExportEnabledSwitch').is(':checked');
+                const mode = $('#autoExportMode').val();
+                const customName = $('#CustomFileName').val() || 'Donations_Export';
+                const exportFolder = $('#ExportFolderPath').val() || 'DonationsExport (in My Documents)';
+
+                if (isEnabled) {
+                    let statusText = `Auto-export is <strong>enabled</strong>. `;
+
+                    switch(mode) {
+                        case 'single_file':
+                            statusText += `New donations will be exported to a single file named <strong>${customName}.csv</strong> in the folder <strong>${exportFolder}</strong>.`;
+                            break;
+                        case 'daily_file':
+                            const today = new Date();
+                            const dateStr = today.toISOString().split('T')[0].replace(/-/g, '_');
+                            statusText += `New donations will be exported to daily files named <strong>${customName}_${dateStr}.csv</strong> in the folder <strong>${exportFolder}</strong>.`;
+                            break;
+                        case 'individual_files':
+                            statusText += `Each new donation will be exported to its own file named <strong>${customName}_DonationID.csv</strong> in the folder <strong>${exportFolder}</strong>.`;
+                            break;
+                    }
+
+                    $('#autoExportStatusText').html(statusText);
+                    $('#autoExportStatus').removeClass('alert-info').addClass('alert-success').show();
+                } else {
+                    $('#autoExportStatusText').text('Auto-export is disabled. Enable it to automatically export new donations.');
+                    $('#autoExportStatus').removeClass('alert-success').addClass('alert-info').show();
+                }
+            }
+
+            // Call this function when the page loads and when settings change
+            $(document).ready(function() {
+                updateAutoExportStatus();
+
+                $('#autoExportEnabledSwitch').change(updateAutoExportStatus);
+                $('#autoExportMode').change(updateAutoExportStatus);
+                $('#CustomFileName').on('input', updateAutoExportStatus);
+                $('#ExportFolderPath').on('input', updateAutoExportStatus);
             });
         });
     </script>

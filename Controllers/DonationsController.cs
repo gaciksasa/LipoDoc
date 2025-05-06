@@ -432,154 +432,230 @@ namespace DeviceDataCollector.Controllers
         [HttpPost]
         public async Task<IActionResult> ExportData(ExportViewModel model)
         {
-            // Get the data from the database based on filters
-            var query = _context.DonationsData.AsQueryable();
-
-            // Apply date range filter if provided
-            if (model.StartDate.HasValue)
+            try
             {
-                query = query.Where(d => d.Timestamp >= model.StartDate.Value);
-            }
+                // Get the data from the database based on filters
+                var query = _context.DonationsData.AsQueryable();
 
-            if (model.EndDate.HasValue)
-            {
-                // Add one day to include the end date fully
-                var endDatePlusOne = model.EndDate.Value.AddDays(1);
-                query = query.Where(d => d.Timestamp < endDatePlusOne);
-            }
-
-            // Apply device filter if provided
-            if (!string.IsNullOrEmpty(model.DeviceId))
-            {
-                query = query.Where(d => d.DeviceId == model.DeviceId);
-            }
-
-            // Order by timestamp descending (newest first)
-            var donations = await query
-                .OrderByDescending(d => d.Timestamp)
-                .ToListAsync();
-
-            // Generate CSV content
-            var csv = new StringBuilder();
-
-            // Process column order
-            List<string> columnsInOrder = model.ColumnOrder;
-
-            // Extract data columns and empty columns
-            var dataColumns = new List<string>();
-            var emptyColumns = new List<string>();
-
-            foreach (var column in columnsInOrder)
-            {
-                if (column.StartsWith("empty_"))
+                // Apply date range filter if provided
+                if (model.StartDate.HasValue)
                 {
-                    emptyColumns.Add(column);
-                }
-                else
-                {
-                    dataColumns.Add(column);
-                }
-            }
-
-            // Determine which delimiter to use
-            string delimiter = model.Delimiter;
-            if (model.Delimiter == "custom" && !string.IsNullOrEmpty(model.CustomSeparator))
-            {
-                delimiter = model.CustomSeparator;
-            }
-
-            // Add header if IncludeHeaders is true
-            if (model.IncludeHeaders)
-            {
-                var headerParts = new List<string>();
-
-                // Process each column according to its type
-                foreach (var column in columnsInOrder)
-                {
-                    if (column.StartsWith("empty_"))
-                    {
-                        // Empty column - use a default name or the name provided
-                        int emptyIndex = int.Parse(column.Substring(6));
-                        headerParts.Add($"\"Empty {emptyIndex + 1}\"");
-                    }
-                    else
-                    {
-                        // Regular data column
-                        headerParts.Add($"\"{GetColumnDisplayName(column)}\"");
-                    }
+                    query = query.Where(d => d.Timestamp >= model.StartDate.Value);
                 }
 
-                var headerLine = string.Join(delimiter, headerParts);
-                csv.AppendLine(headerLine);
-            }
-
-            // Add data rows
-            foreach (var donation in donations)
-            {
-                var row = new List<string>();
-
-                // Add data for columns in the specified order
-                foreach (var column in columnsInOrder)
+                if (model.EndDate.HasValue)
                 {
-                    if (column.StartsWith("empty_"))
-                    {
-                        // Empty column - add an empty string
-                        row.Add("\"\"");
-                    }
-                    else
-                    {
-                        // Regular data column - get the actual value
-                        string value = GetPropertyValue(donation, column, model.DateFormat, model.TimeFormat);
-                        // Quote the value and escape any quotes inside it
-                        row.Add($"\"{value.Replace("\"", "\"\"")}\"");
-                    }
+                    // Add one day to include the end date fully
+                    var endDatePlusOne = model.EndDate.Value.AddDays(1);
+                    query = query.Where(d => d.Timestamp < endDatePlusOne);
                 }
 
-                // Use the potentially custom delimiter
-                csv.AppendLine(string.Join(delimiter, row));
-            }
-
-            // Generate file name
-            string fileName = $"Donations_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-
-            // Check if a folder path was provided
-            string fullPath;
-            if (!string.IsNullOrEmpty(model.ExportFolderPath))
-            {
-                try
+                // Apply device filter if provided
+                if (!string.IsNullOrEmpty(model.DeviceId))
                 {
-                    // Ensure the folder exists
-                    string folderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), model.ExportFolderPath);
-                    Directory.CreateDirectory(folderPath);
+                    query = query.Where(d => d.DeviceId == model.DeviceId);
+                }
 
-                    // Create the full file path
-                    fullPath = Path.Combine(folderPath, fileName);
+                // Order by timestamp descending (newest first)
+                var donations = await query
+                    .OrderByDescending(d => d.Timestamp)
+                    .ToListAsync();
 
-                    // Write the CSV to the file
-                    await System.IO.File.WriteAllTextAsync(fullPath, csv.ToString());
-
-                    // Set success message
-                    TempData["SuccessMessage"] = $"File exported successfully to {fullPath}";
-
-                    // Return to the export page
+                if (donations.Count == 0)
+                {
+                    TempData["ErrorMessage"] = "No donations found matching the filter criteria.";
                     return RedirectToAction(nameof(Export), new { configId = model.SelectedConfigId });
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error saving file to folder: {ex.Message}");
-                    TempData["ErrorMessage"] = $"Error saving file: {ex.Message}. Falling back to browser download.";
 
-                    // Fallback to browser download
-                    byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
-                    return File(bytes, "text/csv", fileName);
+                // If a folder path was provided, use the export helper for consistent formatting
+                if (!string.IsNullOrEmpty(model.ExportFolderPath))
+                {
+                    try
+                    {
+                        // Get existing export configuration or create a temporary one
+                        ExportSettingsConfig config;
+
+                        if (model.SelectedConfigId.HasValue)
+                        {
+                            config = await _context.ExportSettingsConfigs.FindAsync(model.SelectedConfigId.Value);
+                            if (config == null)
+                            {
+                                // Create a temporary config from the model settings
+                                config = CreateConfigFromModel(model);
+                            }
+                            else
+                            {
+                                // Update configuration with current form values
+                                UpdateConfigFromModel(config, model);
+                            }
+                        }
+                        else
+                        {
+                            // If no config ID, use a temporary one based on the form settings
+                            config = CreateConfigFromModel(model);
+                        }
+
+                        // Use the export helper
+                        await _exportHelper.ExportDonations(donations, config);
+
+                        // Determine the export path for the success message
+                        string exportPath = GetExportPath(model);
+
+                        // Set success message
+                        TempData["SuccessMessage"] = $"Successfully exported {donations.Count} donations to: {exportPath}";
+
+                        // Return to the export page
+                        return RedirectToAction(nameof(Export), new { configId = model.SelectedConfigId });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error using export helper: {ex.Message}");
+                        TempData["ErrorMessage"] = $"Error saving file: {ex.Message}. Falling back to browser download.";
+                    }
                 }
+
+                // If we get here, either no folder path was provided or there was an error using the helper
+                // Fall back to generating a CSV file for browser download
+                var csv = new StringBuilder();
+
+                // Process column order
+                List<string> columnsInOrder = model.ColumnOrder;
+
+                // Determine which delimiter to use
+                string delimiter = model.Delimiter;
+                if (model.Delimiter == "custom" && !string.IsNullOrEmpty(model.CustomSeparator))
+                {
+                    delimiter = model.CustomSeparator;
+                }
+
+                // Add header if IncludeHeaders is true
+                if (model.IncludeHeaders)
+                {
+                    var headerParts = new List<string>();
+
+                    // Process each column according to its type
+                    foreach (var column in columnsInOrder)
+                    {
+                        if (column.StartsWith("empty_"))
+                        {
+                            // Empty column - use a default name
+                            int emptyIndex = int.Parse(column.Substring(6));
+                            headerParts.Add($"\"Empty {emptyIndex + 1}\"");
+                        }
+                        else
+                        {
+                            // Regular data column
+                            headerParts.Add($"\"{GetColumnDisplayName(column)}\"");
+                        }
+                    }
+
+                    var headerLine = string.Join(delimiter, headerParts);
+                    csv.AppendLine(headerLine);
+                }
+
+                // Add data rows
+                foreach (var donation in donations)
+                {
+                    var row = new List<string>();
+
+                    // Add data for columns in the specified order
+                    foreach (var column in columnsInOrder)
+                    {
+                        if (column.StartsWith("empty_"))
+                        {
+                            // Empty column - add an empty string
+                            row.Add("\"\"");
+                        }
+                        else
+                        {
+                            // Regular data column - get the actual value
+                            string value = GetPropertyValue(donation, column, model.DateFormat, model.TimeFormat);
+                            // Quote the value and escape any quotes inside it
+                            row.Add($"\"{value.Replace("\"", "\"\"")}\"");
+                        }
+                    }
+
+                    // Use the potentially custom delimiter
+                    csv.AppendLine(string.Join(delimiter, row));
+                }
+
+                // Return the CSV file for browser download
+                byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
+                string fileName = $"Donations_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                return File(bytes, "text/csv", fileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error exporting donations");
+                TempData["ErrorMessage"] = $"Error during export: {ex.Message}";
+                return RedirectToAction(nameof(Export), new { configId = model.SelectedConfigId });
+            }
+        }
+
+        private ExportSettingsConfig CreateConfigFromModel(ExportViewModel model)
+        {
+            return new ExportSettingsConfig
+            {
+                Name = model.ConfigName ?? "Temporary Export",
+                Description = model.ConfigDescription ?? "Created from manual export",
+                DateFormat = model.DateFormat,
+                TimeFormat = model.TimeFormat,
+                Delimiter = model.Delimiter,
+                CustomSeparator = model.CustomSeparator,
+                IncludeHeaders = model.IncludeHeaders,
+                SelectedColumnsJson = System.Text.Json.JsonSerializer.Serialize(model.SelectedColumns),
+                ColumnOrderJson = System.Text.Json.JsonSerializer.Serialize(model.ColumnOrder),
+                EmptyColumnsCount = model.EmptyColumnsCount,
+                ExportFolderPath = model.ExportFolderPath,
+                CustomFileName = model.CustomFileName ?? "Manual_Export",
+                AutoExportMode = model.AutoExportMode
+            };
+        }
+
+        private void UpdateConfigFromModel(ExportSettingsConfig config, ExportViewModel model)
+        {
+            // Only update the export-specific properties, not things like Name, Description, IsDefault
+            config.DateFormat = model.DateFormat;
+            config.TimeFormat = model.TimeFormat;
+            config.Delimiter = model.Delimiter;
+            config.CustomSeparator = model.CustomSeparator;
+            config.IncludeHeaders = model.IncludeHeaders;
+            config.SelectedColumnsJson = System.Text.Json.JsonSerializer.Serialize(model.SelectedColumns);
+            config.ColumnOrderJson = System.Text.Json.JsonSerializer.Serialize(model.ColumnOrder);
+            config.EmptyColumnsCount = model.EmptyColumnsCount;
+            config.ExportFolderPath = model.ExportFolderPath;
+            config.CustomFileName = model.CustomFileName ?? config.CustomFileName ?? "Manual_Export";
+            config.AutoExportMode = model.AutoExportMode;
+            config.LastUsedAt = DateTime.Now;
+        }
+
+        private string GetExportPath(ExportViewModel model)
+        {
+            string exportFolder = model.ExportFolderPath;
+            if (!Path.IsPathRooted(exportFolder))
+            {
+                exportFolder = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    exportFolder
+                );
+            }
+
+            string fileName;
+            if (model.AutoExportMode == "daily_file")
+            {
+                string dateStr = DateTime.Now.ToString("yyyy_MM_dd");
+                fileName = $"{model.CustomFileName ?? "Donations_Export"}_{dateStr}.csv";
+            }
+            else if (model.AutoExportMode == "individual_files")
+            {
+                fileName = $"{model.CustomFileName ?? "Donations_Export"}_[multiple files].csv";
             }
             else
             {
-                // No folder path provided, use browser download
-                byte[] bytes = Encoding.UTF8.GetBytes(csv.ToString());
-                return File(bytes, "text/csv", fileName);
+                fileName = $"{model.CustomFileName ?? "Donations_Export"}.csv";
             }
+
+            return Path.Combine(exportFolder, fileName);
         }
 
         private string GetColumnDisplayName(string columnId)
