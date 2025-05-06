@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using DeviceDataCollector.Services;
 
 namespace DeviceDataCollector.Controllers
 {
@@ -813,6 +814,50 @@ namespace DeviceDataCollector.Controllers
 
             // Return to Export view instead of ExportSettings
             return RedirectToAction(nameof(Export));
+        }
+
+        private readonly DonationExportHelper _exportHelper;
+
+        // Update the constructor to include the export helper
+        public DonationsController(
+            ApplicationDbContext context,
+            ILogger<DonationsController> logger,
+            DonationExportHelper exportHelper)
+        {
+            _context = context;
+            _logger = logger;
+            _exportHelper = exportHelper;
+        }
+
+        // Add this method to the class - we'll call it when processing TCPServer messages
+        public async Task TriggerAutoExportAsync(DonationsData donation)
+        {
+            if (donation == null)
+            {
+                return;
+            }
+
+            try
+            {
+                await _exportHelper.ExportDonationAsync(donation);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error auto-exporting donation {donation.Id}");
+            }
+        }
+
+        // Add to the CreateDonation method (if it exists) or to where donations are added to the database
+        private async Task<int> CreateDonationAsync(DonationsData donation)
+        {
+            // Add to database
+            _context.DonationsData.Add(donation);
+            await _context.SaveChangesAsync();
+
+            // Trigger auto-export
+            await TriggerAutoExportAsync(donation);
+
+            return donation.Id;
         }
     }
 }

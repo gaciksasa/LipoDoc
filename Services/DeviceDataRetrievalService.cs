@@ -3,6 +3,7 @@ using DeviceDataCollector.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Sockets;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace DeviceDataCollector.Services
 {
@@ -289,6 +290,13 @@ namespace DeviceDataCollector.Services
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var messageParser = scope.ServiceProvider.GetRequiredService<DeviceMessageParser>();
 
+                // Try to get the export helper (it's optional, so we use GetService rather than GetRequiredService)
+                var exportHelper = scope.ServiceProvider.GetService<DonationExportHelper>();
+
+                // Use the messageParser to determine message type
+                var messageType = messageParser.DetermineMessageType(message);
+                _logger.LogInformation($"Message type determined: {messageType}");
+
                 // Parse the message and store it in the database
                 var parsedMessage = messageParser.ParseMessage(message, ipAddress, port);
 
@@ -302,9 +310,23 @@ namespace DeviceDataCollector.Services
                     }
                     else if (parsedMessage is DonationsData donationData)
                     {
+                        // Store donation data
                         dbContext.DonationsData.Add(donationData);
                         await dbContext.SaveChangesAsync();
-                        _logger.LogInformation($"Buffered donation data from {ipAddress}:{port} stored in database");
+                        _logger.LogInformation($"Donation data from {donationData.DeviceId} stored in database");
+
+                        // Trigger auto-export if export helper is available
+                        if (exportHelper != null)
+                        {
+                            try
+                            {
+                                await exportHelper.ExportDonationAsync(donationData);
+                            }
+                            catch (Exception exportEx)
+                            {
+                                _logger.LogError(exportEx, $"Error auto-exporting donation {donationData.Id}");
+                            }
+                        }
                     }
                 }
             }

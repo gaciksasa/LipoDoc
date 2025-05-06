@@ -59,6 +59,7 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Schedu
 builder.Services.AddSingleton<ApplicationLifetimeService>();
 builder.Services.AddScoped<DeviceCommunicationService>();
 builder.Services.AddHostedService<AutoExportService>();
+builder.Services.AddScoped<DonationExportHelper>();
 
 var app = builder.Build();
 
