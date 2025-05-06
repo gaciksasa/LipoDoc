@@ -72,6 +72,7 @@
                     @{
                         var controller = ViewContext.RouteData.Values["Controller"].ToString();
                         var action = ViewContext.RouteData.Values["Action"].ToString();
+                        var isExportPage = controller == "Donations" && action == "Export";
                     }
                     <ul class="nav nav-pills flex-column">
                         <li class="nav-item">
@@ -80,7 +81,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link @(controller == "Donations" ? "active" : "") theme-transition" asp-controller="Donations" asp-action="Index">
+                            <a class="nav-link @(controller == "Donations" && action != "Export" ? "active" : "") theme-transition" asp-controller="Donations" asp-action="Index">
                                 <i class="bi bi-droplet"></i> Donations
                             </a>
                         </li>
@@ -89,8 +90,6 @@
                                 <i class="bi bi-hdd-network"></i> Devices
                             </a>
                         </li>
-                        <!-- Update in Views/Shared/_Layout.cshtml -->
-                        <!-- Replace the existing Settings nav item for admins with this accordion structure -->
                         @if (User.IsInRole("Admin"))
                         {
                             <li class="nav-item">
@@ -101,19 +100,22 @@
 
                             <!-- Settings Accordion -->
                             <li class="nav-item">
+                                @{
+                                    bool shouldExpandAccordion = isExportPage;
+                                }
                                 <div class="accordion" id="settingsAccordion">
                                     <div class="accordion-item border-0">
                                         <h2 class="accordion-header" id="settingsHeading">
-                                            <button class="accordion-button collapsed px-3 py-2 @(controller == "System" ? "text-primary" : "")"
+                                            <button class="accordion-button @(shouldExpandAccordion ? "" : "collapsed") px-3 py-2 @(controller == "System" || isExportPage ? "text-primary" : "")"
                                                     type="button"
                                                     data-bs-toggle="collapse"
                                                     data-bs-target="#settingsCollapse"
-                                                    aria-expanded="false"
+                                                    aria-expanded="@(shouldExpandAccordion ? "true" : "false")"
                                                     aria-controls="settingsCollapse">
                                                 <i class="bi bi-gear me-2"></i> Settings
                                             </button>
                                         </h2>
-                                        <div id="settingsCollapse" class="accordion-collapse collapse" aria-labelledby="settingsHeading" data-bs-parent="#settingsAccordion">
+                                        <div id="settingsCollapse" class="accordion-collapse @(shouldExpandAccordion ? "show" : "collapse")" aria-labelledby="settingsHeading" data-bs-parent="#settingsAccordion">
                                             <div class="accordion-body py-1 px-0">
                                                 <ul class="nav nav-pills flex-column">
                                                     <li class="nav-item">
@@ -133,6 +135,12 @@
                                                         <a class="nav-link @(controller == "System" && action == "Backup" ? "active" : "") theme-transition ps-5"
                                                            asp-controller="System" asp-action="Backup">
                                                             <i class="bi bi-cloud-arrow-up"></i> Backup
+                                                        </a>
+                                                    </li>
+                                                    <li class="nav-item">
+                                                        <a class="nav-link @(controller == "Donations" && action == "Export" ? "active" : "") theme-transition ps-5"
+                                                           asp-controller="Donations" asp-action="Export">
+                                                            <i class="bi bi-box-arrow-in-right"></i> Export
                                                         </a>
                                                     </li>
                                                 </ul>

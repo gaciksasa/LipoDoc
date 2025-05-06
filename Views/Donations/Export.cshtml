@@ -92,14 +92,14 @@
                                                 @if (column.Selected)
                                                 {
                                                     <input class="form-check-input column-checkbox" type="checkbox"
-                                                        value="@column.Id" id="column_@column.Id"
-                                                        name="SelectedColumns" checked>
+                                                    value="@column.Id" id="column_@column.Id"
+                                                    name="SelectedColumns" checked>
                                                 }
                                                 else
                                                 {
                                                     <input class="form-check-input column-checkbox" type="checkbox"
-                                                        value="@column.Id" id="column_@column.Id"
-                                                        name="SelectedColumns">
+                                                    value="@column.Id" id="column_@column.Id"
+                                                    name="SelectedColumns">
                                                 }
                                                 <label class="form-check-label" for="column_@column.Id">
                                                     @column.Name
@@ -129,7 +129,7 @@
                                             <span>Column Order</span>
                                             <div class="input-group input-group-sm" style="max-width: 300px;">
                                                 <input type="text" class="form-control" id="emptyColumnName"
-                                                    placeholder="Empty Column Name (optional)">
+                                                placeholder="Empty Column Name (optional)">
                                                 <button class="btn btn-outline-primary" type="button" id="addEmptyColumnBtn">
                                                     <i class="bi bi-plus-circle"></i> Add Empty Column
                                                 </button>
@@ -184,7 +184,7 @@
                                                 @foreach (var column in columnsToDisplay)
                                                 {
                                                     <li class="list-group-item d-flex justify-content-between align-items-center"
-                                                        data-column-id="@column.Id">
+                                                    data-column-id="@column.Id">
                                                         <span><i class="bi bi-grip-vertical me-2"></i>@column.Name</span>
                                                         <input type="hidden" name="ColumnOrder" value="@column.Id" />
                                                         <button type="button" class="btn btn-sm btn-outline-danger remove-column-btn">
@@ -247,18 +247,6 @@
                             </div>
                         </div>
                         <div class="row mb-4">
-                            <div class="col-md-12 mb-3">
-                                <label asp-for="ExportFolderPath" class="form-label">Export Folder</label>
-                                <div class="input-group">
-                                    <input type="text" asp-for="ExportFolderPath" class="form-control" placeholder="C:\Exports">
-                                    <button class="btn btn-outline-secondary" type="button" id="selectFolderBtn">
-                                        <i class="bi bi-folder2-open"></i> Browse
-                                    </button>
-                                </div>
-                                <small class="form-text text-muted">Enter the path where files will be saved.</small>
-                            </div>
-                        </div>
-                        <div class="row mb-4">
                             <div class="col-md-4 mb-3">
                                 <label asp-for="DateFormat" class="form-label">Date Format</label>
                                 <select asp-for="DateFormat" asp-items="Model.DateFormatOptions" class="form-select">
@@ -272,7 +260,7 @@
                         </div>
 
                         <!-- Save Configuration Section -->
-                        <div class="card mb-4 bg-light">
+                        <div class="card mb-4">
                             <div class="card-header">
                                 <h6 class="mb-0">Save Configuration</h6>
                             </div>
@@ -281,12 +269,12 @@
                                     <div class="col-md-6 mb-3">
                                         <label asp-for="ConfigName" class="form-label">Configuration Name</label>
                                         <input asp-for="ConfigName" class="form-control" placeholder="My Export Configuration" 
-                                               value="@Model.ConfigName">
+                                        value="@Model.ConfigName">
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label asp-for="ConfigDescription" class="form-label">Description (Optional)</label>
                                         <input asp-for="ConfigDescription" class="form-control" placeholder="Description of this configuration"
-                                               value="@Model.ConfigDescription">
+                                        value="@Model.ConfigDescription">
                                     </div>
                                 </div>
                                 <div class="row">
@@ -307,12 +295,19 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="row">
+                                    <div class="col-md-12 mb-3">
+                                        <label asp-for="ExportFolderPath" class="form-label">Export Folder</label>
+                                        <div class="input-group">
+                                            <input type="text" asp-for="ExportFolderPath" class="form-control" placeholder="">
+                                            <button class="btn btn-outline-secondary" type="button" id="selectFolderBtn">
+                                                <i class="bi bi-folder2-open"></i> Browse
+                                            </button>
+                                        </div>
+                                        <small class="form-text text-muted">Enter the path where files will be saved.</small>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle me-2"></i>
-                            The export will include all donations that match your filter criteria. For large datasets, the export might take a few moments.
                         </div>
 
                         <div class="d-flex justify-content-between mt-4">
@@ -323,7 +318,7 @@
                                 </button>
                             </div>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-download"></i> Export to CSV
+                                <i class="bi bi-download"></i> Manual Export to CSV
                             </button>
                         </div>
                     </form>
@@ -404,8 +399,6 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Description</th>
-                                    <th>Created By</th>
-                                    <th>Last Used</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -422,38 +415,29 @@
                                     <tr>
                                         <td>@displayName</td>
                                         <td>-</td>
-                                        <td>-</td>
-                                        <td>-</td>
                                         <td>
                                             @if (isDefault)
                                             {
-                                                <span class="badge bg-success">Default</span>
+                                                <span class="badge bg-primary">Default</span>
+                                            }
+                                            else
+                                            {
+                                                <form asp-action="SetDefaultExportSettings" asp-route-id="@configValue" method="post" style="display: inline;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-star"></i> Set Default
+                                                    </button>
+                                                </form>
                                             }
                                         </td>
                                         <td>
-                                            <div class="btn-group" role="group">
-                                                <a href="@Url.Action("Export", "Donations", new { configId = configValue })" class="btn btn-sm btn-primary">
-                                                    <i class="bi bi-box-arrow-in-right"></i> Load
-                                                </a>
-
-                                                @if (!isDefault)
-                                                {
-                                                    <form asp-action="SetDefaultExportSettings" asp-route-id="@configValue" method="post" style="display: inline;">
-                                                        @Html.AntiForgeryToken()
-                                                        <button type="submit" class="btn btn-sm btn-success">
-                                                            <i class="bi bi-star"></i> Set Default
-                                                        </button>
-                                                    </form>
-                                                }
-
-                                                <form asp-action="DeleteExportSettings" asp-route-id="@configValue" method="post" 
-                                                      style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this configuration?');">
-                                                    @Html.AntiForgeryToken()
-                                                    <button type="submit" class="btn btn-sm btn-danger">
-                                                        <i class="bi bi-trash"></i> Delete
-                                                    </button>
-                                                </form>
-                                            </div>
+                                            <form asp-action="DeleteExportSettings" asp-route-id="@configValue" method="post" 
+                                                    style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this configuration?');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                 }
